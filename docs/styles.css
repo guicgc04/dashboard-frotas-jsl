@@ -329,6 +329,7 @@ tbody td{ padding:6px 14px; color:var(--text-dark); white-space:nowrap; }
 /* Grade de mini-cards (Custo Acumulado, Registros, Mau Uso, Preventiva...).
    4 colunas para caber tudo em 1 linha só e manter o painel baixo. */
 .detail-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:6px; }
+.detail-grid.detail-grid-5{ grid-template-columns:repeat(5,1fr); }
 .detail-grid.narrow{ grid-template-columns:repeat(2,1fr); } /* variante 2 colunas, não usada atualmente */
 .mini-card{ background:#f7f7fb; border:1px solid var(--gray-border); border-radius:var(--radius-sm); padding:6px 8px; }
 .mini-card .k{ font-size:8.5px; color:var(--text-mid); font-weight:700; text-transform:uppercase; letter-spacing:.2px; }
@@ -404,4 +405,5 @@ tbody td{ padding:6px 14px; color:var(--text-dark); white-space:nowrap; }
   .grid-2{ grid-template-columns:1fr; }
   .grid-3{ grid-template-columns:1fr; }
   .detail-grid{ grid-template-columns:repeat(2,1fr); }
+  .detail-grid.detail-grid-5{ grid-template-columns:repeat(2,1fr); }
 }

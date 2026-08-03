@@ -533,11 +533,16 @@ function openDetail(f, tr){
     ? 'clique em outra linha na tabela para trocar de frota'
     : 'mostrando a frota de maior custo acumulado — clique em outra linha na tabela para ver os detalhes dela';
 
-  // Mini-cards: custo acumulado, nº de registros, mau uso, preventiva
+  // Mini-cards: custo acumulado, nº de registros, mau uso, preventiva, horímetro
   document.getElementById('detCusto').textContent = 'R$ ' + fmtBRL(f.custo);
   document.getElementById('detCount').textContent = f.count;
   document.getElementById('detMau').textContent   = f.classes['Mau uso']   || 0;
   document.getElementById('detPrev').textContent  = f.classes['Preventiva'] || 0;
+  const cardHorimetro = document.getElementById('detHorimetro').closest('.mini-card');
+  document.getElementById('detHorimetro').textContent = f.horimetroAtual
+    ? `${f.horimetroAtual.valor.toLocaleString('pt-BR')} h (${f.horimetroAtual.data})`
+    : 'sem leitura registrada';
+  cardHorimetro.classList.toggle('nodata', !f.horimetroAtual);
 
   // Bloco de preventiva: só existe conteúdo real se o ETL conseguiu casar
   // o código desta frota com uma linha de Preventiva_-_Gru.csv (12 de 39).
