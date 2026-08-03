@@ -10,7 +10,7 @@
 
    Índice deste arquivo:
      1. CONSTANTES E MAPEAMENTOS FIXOS (cores, badges, rótulos de status)
-     2. PREPARAÇÃO DA BASE (fleet[]) — status real x ilustrativo por frota
+     2. PREPARAÇÃO DA BASE (fleet[]) — status real x "sem dado" por frota
      3. ESTADO GLOBAL DE FILTROS E ORDENAÇÃO
      4. UTILITÁRIOS (formatação de moeda, tooltip dos gráficos)
      5. FILTROS — aplica os filtros ativos sobre a base fleet[]
@@ -51,7 +51,8 @@ const statusLabel = { g:'Em dia', y:'Próx. vencimento', r:'Vencida', n:'Sem dad
      - modeloDisplay / marcaDisplay: "—" quando não há cadastro
      - status: cor do bloco "Preventiva x Corretiva" para aquela frota
      - hasRealPreventiva: se true, o status vem de um cruzamento real com
-       Preventiva_-_Gru.csv; se false, é um placeholder ilustrativo
+       Preventiva_-_Gru.csv; se false, mostramos "Sem dado" (cinza) — nunca
+       inventamos uma cor plausível sem essa base real por trás
    ============================================================================ */
 
 /**
@@ -61,11 +62,11 @@ const statusLabel = { g:'Em dia', y:'Próx. vencimento', r:'Vencida', n:'Sem dad
  *       desvio > 0        → já venceu (vermelho)
  *       desvio > -300h    → vencendo em breve (amarelo)
  *       caso contrário    → em dia (verde)
- *   - Se NÃO há match real, gera um status pseudo-aleatório mas DETERMINÍSTICO
- *     (hash do código da frota) só para o layout ficar navegável de ponta a
- *     ponta com as 27 frotas que ainda não têm dado real de preventiva.
+ *   - Se NÃO há match real, devolve "n" (Sem dado, cinza) — nunca inventamos
+ *     uma cor plausível sem dado real por trás. Hoje isso cobre 27 das 39
+ *     frotas, que ainda não têm cruzamento com o SISMA.
  */
-function realOrPseudoStatus(f){
+function statusDaFrota(f){
   if (f.preventiva) {
     const d = f.preventiva.proxima_desvio;
     if (d === null || d === undefined) return 'n';
@@ -73,12 +74,12 @@ function realOrPseudoStatus(f){
     if (d > -300) return 'y';     // vencendo em breve
     return 'g';
   }
-  let h = 0;
-  const s = f.frota;
-  for (let i=0;i<s.length;i++) h = (h*31 + s.charCodeAt(i)) % 997;
-  if (h % 10 < 6) return 'g';
-  if (h % 10 < 8) return 'y';
-  return 'r';
+  // Sem cruzamento real com Preventiva_-_Gru.csv: NÃO inventamos uma cor
+  // plausível aqui. Mostrar um status verde/amarelo/vermelho sem dado real
+  // por trás induziria as pessoas a confiar num número que não existe —
+  // "n" (Sem dado) é a resposta honesta pras 27 frotas que ainda não têm
+  // esse cruzamento.
+  return 'n';
 }
 
 // Base de trabalho usada por TODO o dashboard (tabela, KPIs, gráficos, detalhe).
@@ -86,7 +87,7 @@ const fleet = FLEET_RAW.map(f => ({
   ...f,
   modeloDisplay: f.modelo || '—',
   marcaDisplay: f.marca || '—',
-  status: realOrPseudoStatus(f),
+  status: statusDaFrota(f),
   hasRealPreventiva: !!f.preventiva
 }));
 
