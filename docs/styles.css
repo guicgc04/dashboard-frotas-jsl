@@ -1,0 +1,407 @@
+/* ============================================================================
+   DASHBOARD DE FROTAS — JSL
+   Folha de estilos (CSS)
+   ----------------------------------------------------------------------------
+   Índice deste arquivo (procure pelos títulos em MAIÚSCULO):
+     1. TOKENS DE DESIGN (cores, fontes, sombras, raios de borda)
+     2. BASE / RESET
+     3. CABEÇALHO (logo, título, exportar)
+     4. FILTROS (barra de filtro usada no bloco Causa Raiz)
+     5. LAYOUT GERAL (linhas e painéis flexíveis do dashboard)
+     6. TÍTULOS DE SEÇÃO E SELOS (real/mock/parcial)
+     7. BLOCO KPIs GERAIS (cards com ícone no topo esquerdo)
+     8. GRÁFICOS (contêiner genérico usado por todos os gráficos)
+     9. BLOCO PREVENTIVA X CORRETIVA (cards de status + tabela de frotas)
+    10. PAINEL DE DETALHE DA FROTA (aparece abaixo dos KPIs)
+    11. BLOCO CAUSA RAIZ DAS AVARIAS (rankings + toggle Ocorrências/Valor)
+    12. TOOLTIP DOS GRÁFICOS SVG
+    13. RESPONSIVIDADE (telas menores)
+   ============================================================================ */
+
+
+/* ============================================================================
+   1. TOKENS DE DESIGN
+   Variáveis CSS centralizadas: mudar uma cor ou espaçamento aqui reflete em
+   todo o dashboard. Paleta baseada na identidade vermelha da JSL.
+   ============================================================================ */
+:root{
+  /* Vermelho institucional + gradiente usado em ícones, botões e barras */
+  --red-dark:#7a0f1c;
+  --red:#c8172f;
+  --red-bright:#ff5064;
+  --red-grad: linear-gradient(135deg, #ff5064 0%, #c8172f 60%, #8f0f22 100%);
+
+  /* Cores de status: verde (em dia / preventiva), amarelo (atenção), vermelho (crítico) */
+  --green:#33b26a; --green-dark:#1c8a4f;
+  --yellow-bg:#fef3d6; --yellow-bd:#f0d789; --yellow-text:#966b00;
+  --red-bg:#fde3e3; --red-bd:#f3b8b8;
+  --green-bg:#dcf5e6; --green-bd:#a8e4c1;
+
+  /* Fundo da página, cards e bordas */
+  --gray-bg:#f2f3f8;
+  --gray-card:#ffffff;
+  --gray-border:#e7e9f1;
+
+  /* Texto */
+  --text-dark:#1f2233;
+  --text-mid:#7c8194;
+  --table-head:#4b4f63;
+
+  /* Raios de borda (cantos arredondados) e sombras "flutuantes" dos cards */
+  --radius-lg:20px; --radius-md:14px; --radius-sm:10px; --radius-pill:999px;
+  --shadow-card:0 10px 26px -10px rgba(30,32,60,.14), 0 2px 8px -2px rgba(30,32,60,.06);
+  --shadow-soft:0 6px 16px -8px rgba(30,32,60,.10);
+
+  /* Tipografia: Poppins para títulos/números grandes, Inter para texto corrido */
+  --font-display:'Poppins','Segoe UI',Arial,sans-serif;
+  --font-body:'Inter','Segoe UI',Arial,sans-serif;
+}
+
+
+/* ============================================================================
+   2. BASE / RESET
+   ============================================================================ */
+*{ box-sizing:border-box; }
+
+body{
+  margin:0;
+  background:var(--gray-bg);
+  font-family:var(--font-body);
+  color:var(--text-dark);
+  font-size:14.5px;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,.font-display{ font-family:var(--font-display); }
+
+/* Container central da página: tudo (header + conteúdo) fica dentro dele,
+   com margem automática nas laterais para centralizar em qualquer resolução. */
+.page{ max-width:1640px; margin:0 auto; padding:20px 26px; }
+
+
+/* ============================================================================
+   3. CABEÇALHO
+   Grid de 3 colunas (logo | título centralizado | ações), fundo em
+   gradiente vermelho. O título fica sempre no centro do bloco, independente
+   da largura do conteúdo dos outros dois lados.
+   ============================================================================ */
+.header{
+  background:var(--red-grad);
+  color:#fff;
+  display:grid;
+  grid-template-columns:1fr auto 1fr; /* coluna central com largura do conteúdo */
+  align-items:center;
+  gap:16px;
+  padding:16px 26px;
+  border-radius:var(--radius-lg);
+  width:100%;
+  box-shadow:var(--shadow-card);
+}
+.header-left{ display:flex; align-items:center; gap:12px; justify-self:start; }
+
+/* Logo oficial JSL (imagem embutida em base64 no HTML, ver data.js/index.html) */
+.logo{ height:58px; width:auto; display:flex; align-items:center; justify-content:center; flex:0 0 auto; }
+.logo img{ height:100%; width:auto; object-fit:contain; display:block; }
+
+.header-title{ grid-column:2; text-align:center; }
+.header h1{ font-size:22px; margin:0; font-weight:700; letter-spacing:.2px; white-space:nowrap; }
+
+.header-right{ text-align:right; display:flex; align-items:center; gap:16px; justify-self:end; }
+.header-right .meta .label{ font-size:10px; font-weight:700; opacity:.85; letter-spacing:.4px; white-space:nowrap; }
+.header-right .meta .value{ font-size:12.5px; font-weight:600; white-space:nowrap; }
+
+/* Botão "Exportar base completa (.csv)" — dispara downloadCSV() em app.js */
+.btn-export{
+  background:#fff; color:var(--red); border:none; padding:10px 18px; border-radius:var(--radius-pill);
+  font-size:12.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  font-family:var(--font-display); box-shadow:0 4px 10px rgba(0,0,0,.12); transition:transform .12s;
+}
+.btn-export:hover{ transform:translateY(-1px); box-shadow:0 6px 14px rgba(0,0,0,.16); }
+
+
+/* ============================================================================
+   4. FILTROS
+   Barra de filtro "Classificação" usada dentro do bloco Causa Raiz das
+   Avarias (afeta o donut + rankings + a tabela de frotas simultaneamente).
+   ============================================================================ */
+.inline-filters{
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0 14px;
+  padding:10px 14px; background:#fff; border:1px solid var(--gray-border);
+  border-radius:var(--radius-md); box-shadow:var(--shadow-soft);
+}
+.inline-filters label{ font-size:11px; color:var(--text-mid); font-weight:700; margin-right:2px; }
+.inline-filters select, .inline-filters input{
+  font-size:12.5px; padding:6px 10px; border-radius:var(--radius-pill);
+  border:1px solid var(--gray-border); background:#fafbfe; color:var(--text-dark); font-family:var(--font-body);
+}
+.btn-clear{
+  background:#fff; color:var(--text-mid); border:1px solid var(--gray-border); padding:6px 14px;
+  border-radius:var(--radius-pill); font-size:11.5px; font-weight:700; cursor:pointer;
+}
+.btn-clear:hover{ background:#f5f5f9; }
+
+/* Selo que aparece ao lado dos filtros ativos (ex: "Classificação: Mau uso ✕") */
+.active-filter-tag{
+  font-size:11px; background:var(--red-bg); color:var(--red); padding:4px 10px;
+  border-radius:var(--radius-pill); font-weight:700; display:flex; align-items:center; gap:5px;
+}
+.active-filter-tag button{ background:none; border:none; color:var(--red); cursor:pointer; font-weight:900; font-size:11px; }
+
+
+/* ============================================================================
+   5. LAYOUT GERAL — LINHAS E PAINÉIS FLEXÍVEIS
+   O dashboard é organizado em "linhas" (.dash-row), cada uma contendo 2
+   "painéis" (.panel) que dividem a largura disponível proporcionalmente
+   (flex-grow) e ESTICAM para terem a mesma altura (align-items:stretch).
+   Isso evita tanto o efeito "esticado até o fim da tela" quanto o efeito
+   "painéis com alturas desencontradas" ao mesmo tempo.
+
+   Linha 1: painel KPIs (p-kpi)         + painel Preventiva x Corretiva (p-wide)
+   Linha 2: painel Causa Raiz (p-mid)    + painel Custo Total por Período (p-chart)
+   ============================================================================ */
+.wrap{ padding:14px 0 0; }
+
+.dash-row{
+  display:flex;
+  flex-wrap:wrap;          /* quebra para nova linha em telas estreitas */
+  align-items:stretch;     /* os dois painéis da linha ficam com a mesma altura */
+  gap:16px;
+  margin-bottom:16px;
+}
+.panel{ min-width:0; display:flex; flex-direction:column; }
+
+/* Cada tipo de painel tem uma proporção (flex-grow) e um teto de largura
+   (max-width) diferentes — ajustados para a dupla de cada linha somar bem
+   a 100% da largura disponível em qualquer resolução, sem sobra de espaço. */
+.panel.p-kpi{ justify-content:flex-start; flex:1 1 420px; max-width:660px; }  /* Bloco KPIs */
+.panel.p-wide{ flex:2 1 480px; min-width:0; }                                /* Bloco Preventiva x Corretiva */
+.panel.p-mid{ flex:1.05 1 460px; min-width:0; }                              /* Bloco Causa Raiz */
+.panel.p-chart{ flex:1 1 460px; max-width:820px; }                          /* Bloco Custo Total */
+
+
+/* ============================================================================
+   6. TÍTULOS DE SEÇÃO E SELOS DE ORIGEM DOS DADOS
+   Cada bloco tem um título com barra vermelha à esquerda. Os "selos"
+   (real-tag / mock-tag / partial-tag) indicam se os dados daquele bloco
+   são reais (cruzados com as planilhas), ilustrativos, ou parciais.
+   ============================================================================ */
+.section-title{
+  font-family:var(--font-display); font-size:14px; font-weight:700; color:var(--text-dark); margin:0 0 10px;
+  padding-left:10px; border-left:5px solid var(--red); text-transform:uppercase; letter-spacing:.4px;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.section-title .n{ color:var(--red); margin-right:5px; } /* numeração ①②③ do bloco */
+.panel-caption{ font-size:12px; color:var(--text-mid); margin:-4px 0 12px 2px; } /* legenda pequena abaixo do título */
+
+.real-tag{     /* "dados reais — Avarias" */
+  font-family:var(--font-body); font-size:10px; font-weight:700; background:var(--green-bg); color:var(--green-dark);
+  padding:3px 9px; border-radius:var(--radius-pill); margin-left:6px; text-transform:none; letter-spacing:0;
+}
+.mock-tag{     /* dados ilustrativos/mock */
+  font-family:var(--font-body); font-size:10px; font-weight:700; background:#eee; color:#888;
+  padding:3px 9px; border-radius:var(--radius-pill); margin-left:6px; text-transform:none; letter-spacing:0;
+}
+.partial-tag{  /* "status real p/ 12 de 39 frotas — resto ilustrativo" */
+  font-family:var(--font-body); font-size:10px; font-weight:700; background:var(--yellow-bg); color:var(--yellow-text);
+  padding:3px 9px; border-radius:var(--radius-pill); margin-left:6px; text-transform:none; letter-spacing:0;
+}
+
+
+/* ============================================================================
+   7. BLOCO "KPIS GERAIS"
+   Grade 2x2 de cards, cada um com um ícone colorido (SVG) + rótulo + número
+   grande. Alimentado pela função renderKpis() em app.js.
+   ============================================================================ */
+.kpi-row{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+
+.card{ /* estilo-base de "card flutuante" reaproveitado pelos 4 KPIs */
+  background:var(--gray-card); border:1px solid var(--gray-border); border-radius:var(--radius-md);
+  padding:12px 14px; box-shadow:var(--shadow-card);
+}
+.kpi-card{ min-width:0; display:flex; align-items:flex-start; gap:10px; }
+.kpi-icon{ /* chip vermelho em gradiente com o ícone SVG do KPI */
+  width:36px; height:36px; border-radius:11px; flex:0 0 auto; background:var(--red-grad);
+  display:flex; align-items:center; justify-content:center; box-shadow:0 4px 10px -2px rgba(200,23,47,.45);
+}
+.kpi-icon svg{ width:19px; height:19px; stroke:#fff; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.kpi-body{ min-width:0; }
+.kpi-card .label{ font-size:11px; color:var(--text-mid); font-weight:600; white-space:nowrap; }
+.kpi-card .big{ font-family:var(--font-display); font-size:21px; font-weight:700; color:var(--text-dark); margin-top:2px; white-space:nowrap; }
+.kpi-card .delta{ font-size:10px; margin-top:2px; font-weight:600; color:var(--text-mid); white-space:nowrap; }
+
+
+/* ============================================================================
+   8. GRÁFICOS — CONTÊINER GENÉRICO
+   ".chart-card" é o cartão branco que envolve QUALQUER gráfico do dashboard
+   (linha de custo, donut de classificação, rankings). O SVG em si é
+   desenhado dinamicamente em app.js (funções renderCostChart / renderClassChart).
+   ============================================================================ */
+.grid-2{ display:grid; grid-template-columns:1.2fr .8fr; gap:16px; align-items:stretch; }
+
+.chart-card{
+  background:var(--gray-card); border:1px solid var(--gray-border); border-radius:var(--radius-md);
+  padding:16px 18px; position:relative; flex:1; display:flex; flex-direction:column; box-shadow:var(--shadow-card);
+}
+.chart-card h3{ margin:0 0 12px; font-family:var(--font-display); font-size:13.5px; font-weight:600; color:var(--text-dark); }
+
+/* Os dois wrappers abaixo recebem o <svg> gerado via JS e centralizam
+   verticalmente o desenho dentro do card (mesmo se o card crescer). */
+#costChartWrap, #classChartWrap{ flex:1; display:flex; flex-direction:column; justify-content:center; width:100%; }
+
+
+/* ============================================================================
+   9. BLOCO "PREVENTIVA X CORRETIVA"
+   Cards de status (Em dia / Próx. vencimento / Vencida) + tabela com as
+   39 frotas, ordenável e filtrável. Alimentado por renderFleetTable() em app.js.
+   ============================================================================ */
+.status-row{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+.status-card{ border-radius:var(--radius-md); padding:12px 16px; border:1px solid; width:auto; min-width:150px; flex:0 0 auto; box-shadow:var(--shadow-soft); }
+.status-card.green{ background:var(--green-bg); border-color:var(--green-bd); }
+.status-card.yellow{ background:var(--yellow-bg); border-color:var(--yellow-bd); }
+.status-card.red{ background:var(--red-bg); border-color:var(--red-bd); }
+.status-card .label{ font-size:11.5px; font-weight:600; color:var(--text-mid); }
+.status-card .big{ font-family:var(--font-display); font-size:21px; font-weight:700; margin-top:2px; }
+.status-card.green .big{ color:var(--green-dark); }
+.status-card.yellow .big{ color:var(--yellow-text); }
+.status-card.red .big{ color:var(--red); }
+
+.table-card{
+  background:var(--gray-card); border:1px solid var(--gray-border); border-radius:var(--radius-md); overflow:hidden;
+  width:100%; max-width:1100px; flex:1; display:flex; flex-direction:column; box-shadow:var(--shadow-card);
+}
+.table-toolbar{
+  display:flex; align-items:center; padding:9px 14px;
+  border-bottom:1px solid var(--gray-border); background:#fbfbfd; flex-wrap:wrap; gap:8px;
+}
+.table-toolbar label{ font-size:11px; color:var(--text-mid); font-weight:600; }
+.table-toolbar input, .table-toolbar select{
+  font-size:12px; padding:5px 11px; border-radius:var(--radius-pill);
+  border:1px solid var(--gray-border); width:150px; font-family:var(--font-body);
+}
+.table-toolbar .count{ font-size:11px; color:var(--text-mid); font-weight:600; margin-left:auto; white-space:nowrap; }
+
+/* IMPORTANTE: flex-basis fixo (200px) em vez de "flex:1" puro.
+   Isso evita que o navegador calcule a altura "ideal" da tabela como se ela
+   fosse mostrar as 39 linhas de uma vez (o que inflaria o card inteiro).
+   Com uma base pequena e definida, a tabela cresce só o necessário para
+   acompanhar a altura do painel vizinho, com scroll interno para o resto. */
+.table-scroll{ flex:1 1 200px; overflow-y:auto; overflow-x:auto; }
+
+table{ width:100%; border-collapse:collapse; font-size:12px; }
+thead th{
+  background:var(--table-head); color:#fff; text-align:left; padding:8px 14px; font-size:10px;
+  font-weight:700; text-transform:uppercase; letter-spacing:.3px; position:sticky; top:0; cursor:pointer; user-select:none;
+  white-space:nowrap;
+}
+thead th:hover{ background:#3a3d4d; }
+thead th .arrow{ opacity:.65; font-size:9px; } /* seta de ordenação ▴▾ */
+
+tbody tr{ border-bottom:1px solid var(--gray-border); cursor:pointer; transition:background .12s; }
+tbody tr:nth-child(even){ background:#f8f8fb; }
+tbody tr:hover{ background:#fdeaea; }
+tbody tr.active{ background:#fad9db; } /* linha da frota selecionada no painel de detalhe */
+tbody td{ padding:6px 14px; color:var(--text-dark); white-space:nowrap; }
+
+/* Bolinha colorida de status (verde/amarelo/vermelho/cinza) na coluna Frota */
+.dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; vertical-align:middle; }
+.dot.g{ background:var(--green); } .dot.y{ background:#e8b400; } .dot.r{ background:var(--red); } .dot.n{ background:#b8bcbf; }
+.status-text{ font-weight:600; font-size:11.5px; }
+.status-text.g{ color:var(--green-dark); } .status-text.y{ color:var(--yellow-text); } .status-text.r{ color:var(--red); } .status-text.n{ color:#7a7e82; }
+.empty-row td{ text-align:center; color:var(--text-mid); padding:20px; font-style:italic; }
+
+
+/* ============================================================================
+   10. PAINEL DE DETALHE DA FROTA
+   Fica dentro do painel de KPIs (não mais embaixo da tabela — decisão
+   tomada para eliminar o "pulo" de layout ao trocar de frota). Mostra por
+   padrão a frota de maior custo acumulado; atualiza ao clicar em qualquer
+   linha da tabela. Alimentado pela função openDetail() em app.js.
+   ============================================================================ */
+.detail-panel{
+  background:var(--gray-card); border:1px solid var(--gray-border);
+  border-radius:var(--radius-md); padding:11px 13px; margin-top:10px; display:flex; flex-direction:column; min-height:0;
+  box-shadow:var(--shadow-card);
+}
+.detail-head{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:2px; }
+.detail-head h2{ margin:0; font-family:var(--font-display); font-size:14.5px; font-weight:700; color:var(--text-dark); }
+.detail-head .sub{ font-size:10.5px; color:var(--text-mid); margin-top:1px; } /* modelo · marca · ano · chassi */
+.detail-hint{ font-size:10px; color:var(--text-mid); margin-bottom:6px; }     /* "clique em outra linha..." */
+
+/* Grade de mini-cards (Custo Acumulado, Registros, Mau Uso, Preventiva...).
+   4 colunas para caber tudo em 1 linha só e manter o painel baixo. */
+.detail-grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-bottom:6px; }
+.detail-grid.narrow{ grid-template-columns:repeat(2,1fr); } /* variante 2 colunas, não usada atualmente */
+.mini-card{ background:#f7f7fb; border:1px solid var(--gray-border); border-radius:var(--radius-sm); padding:6px 8px; }
+.mini-card .k{ font-size:8.5px; color:var(--text-mid); font-weight:700; text-transform:uppercase; letter-spacing:.2px; }
+.mini-card .v{ font-family:var(--font-display); font-size:11.5px; font-weight:600; margin-top:1px; }
+.mini-card.nodata .v{ color:#aaa; font-weight:500; font-size:10.5px; font-family:var(--font-body); } /* "sem dado real" */
+
+/* Histórico recente de avarias/custo da frota selecionada (tabela pequena
+   com scroll próprio, altura travada em 130px). */
+.hist-scroll{ overflow-y:auto; overflow-x:auto; max-height:130px; }
+.hist-table{ width:100%; border-collapse:collapse; font-size:10.5px; }
+.hist-table th{ background:#f0f1f5; color:var(--text-mid); text-align:left; padding:5px 8px; font-weight:700; border-bottom:2px solid var(--gray-border); position:sticky; top:0; }
+.hist-table td{ padding:5px 8px; border-bottom:1px solid #eee; }
+.hist-table td:nth-child(3){ max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } /* trunca descrição longa */
+
+/* Badge colorido por classificação (Mau uso / Estrutura / Processo / Preventiva / Regularização) */
+.badge{ padding:2px 9px; border-radius:var(--radius-pill); font-size:10px; font-weight:700; }
+.badge.mau{ background:var(--red-bg); color:var(--red); }
+.badge.est{ background:var(--yellow-bg); color:var(--yellow-text); }
+.badge.proc{ background:#e4e0f5; color:#4b3d99; }
+.badge.prev{ background:var(--green-bg); color:var(--green-dark); }
+.badge.reg{ background:#e2eefb; color:#2166a3; }
+
+
+/* ============================================================================
+   11. BLOCO "CAUSA RAIZ DAS AVARIAS"
+   3 cartões lado a lado: donut de classificação, ranking de peças, ranking
+   de frotas com mais "mau uso". Alimentado por renderClassChart() e
+   renderRankings() em app.js.
+   ============================================================================ */
+.grid-3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; flex:1; align-items:stretch; }
+
+/* Linha de ranking (usada tanto para "Peças que Mais Quebram" quanto
+   "Frotas com Mais Avarias por Mau Uso") — nome + barrinha proporcional + valor */
+.rank-row{ display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #f0f0f4; font-size:12px; gap:8px; }
+.rank-row .name{ color:var(--text-dark); flex:1; font-weight:500; }
+.rank-row .bar-mini{ height:5px; background:var(--red-grad); border-radius:3px; margin-top:3px; }
+.rank-row .val{ font-family:var(--font-display); font-weight:700; color:var(--red); min-width:24px; text-align:right; }
+
+/* Toggle em formato pílula "Ocorrências / Valor (R$)" que alterna o modo
+   de cálculo do donut (ver classMode em app.js) */
+.toggle-group{ display:flex; gap:6px; margin-bottom:10px; background:#f1f2f7; padding:4px; border-radius:var(--radius-pill); width:fit-content; }
+.toggle-btn{
+  font-size:11px; font-weight:700; padding:6px 14px; border-radius:var(--radius-pill);
+  border:none; background:transparent; cursor:pointer; color:var(--text-mid); transition:all .15s;
+}
+.toggle-btn.active{ background:var(--red-grad); color:#fff; box-shadow:0 3px 8px -1px rgba(200,23,47,.4); }
+
+.footnote{ font-size:10px; color:var(--text-mid); margin-top:auto; padding-top:8px; font-style:italic; } /* nota de rodapé fixada embaixo do card */
+
+
+/* ============================================================================
+   12. TOOLTIP DOS GRÁFICOS SVG
+   Balão escuro que segue o mouse ao passar sobre pontos do gráfico de linha,
+   fatias do donut ou barras — controlado por showTooltip()/hideTooltip() em app.js.
+   ============================================================================ */
+.svg-tooltip{
+  position:absolute; pointer-events:none; background:var(--text-dark); color:#fff; font-size:12px; font-weight:600;
+  padding:6px 11px; border-radius:8px; white-space:nowrap; opacity:0; transition:opacity .1s; z-index:20;
+  transform:translate(-50%,-115%); box-shadow:0 4px 12px rgba(0,0,0,.2);
+}
+.svg-tooltip.show{ opacity:1; }
+.hoverable{ cursor:pointer; }
+
+
+/* ============================================================================
+   13. RESPONSIVIDADE
+   Em telas estreitas (< 1100px), as grades internas colapsam para menos
+   colunas. O empilhamento dos painéis (.dash-row) já é automático via
+   flex-wrap, definido na seção 5.
+   ============================================================================ */
+@media (max-width:1100px){
+  .kpi-row{ grid-template-columns:repeat(2,1fr); }
+  .grid-2{ grid-template-columns:1fr; }
+  .grid-3{ grid-template-columns:1fr; }
+  .detail-grid{ grid-template-columns:repeat(2,1fr); }
+}
