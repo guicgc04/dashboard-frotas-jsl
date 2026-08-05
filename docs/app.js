@@ -201,7 +201,7 @@ function renderActiveTags(){
   if (filters.minCusto) tags.push(['Custo ≥ R$ '+filters.minCusto, ()=>{document.getElementById('filterMinCusto').value='';filters.minCusto=null;renderAll();}]);
   if (filters.mes) {
     const [ano,mes] = filters.mes.split('-');
-    tags.push(['Mês: '+NOME_MES[mes]+'/'+ano, ()=>{document.getElementById('filterMes').value='';filters.mes='';renderAll();}]);
+    tags.push(['Mês: '+NOME_MES[mes]+'/'+ano, ()=>{document.getElementById('filterMes').value='';filters.mes='';atualizarVisualFiltroMes();renderAll();}]);
   }
   box.innerHTML = tags.map(([label,_],i)=>`<span class="active-filter-tag" data-i="${i}">${label}<button>✕</button></span>`).join('');
   box.querySelectorAll('.active-filter-tag').forEach((el,i)=>{
@@ -667,7 +667,28 @@ document.getElementById('filterClass').addEventListener('change', e=>{ filters.c
 document.getElementById('filterStatus').addEventListener('change', e=>{ filters.status = e.target.value; renderAll(); });
 document.getElementById('filterMinCusto').addEventListener('input', e=>{ filters.minCusto = e.target.value ? parseFloat(e.target.value) : null; renderAll(); });
 document.getElementById('searchBox').addEventListener('input', e=>{ filters.search = e.target.value.trim().toLowerCase(); renderAll(); });
-document.getElementById('filterMes').addEventListener('change', e=>{ filters.mes = e.target.value; renderAll(); });
+
+// O botão-ícone do mês precisa de um pouco mais: além de guardar o
+// filtro, atualiza a legenda (tooltip) pra mostrar QUAL mês está ativo
+// (em vez do genérico "Filtrar por mês"), e destaca o ícone em branco
+// quando há um filtro selecionado — mesmo padrão visual do Modo TV ativo.
+function atualizarVisualFiltroMes(){
+  const wrap = document.getElementById('filterMesWrap');
+  if (filters.mes) {
+    const [ano, mes] = filters.mes.split('-');
+    wrap.setAttribute('data-tooltip', `Mês: ${NOME_MES[mes]}/${ano}`);
+    wrap.classList.add('tem-filtro');
+  } else {
+    wrap.setAttribute('data-tooltip', 'Filtrar por mês');
+    wrap.classList.remove('tem-filtro');
+  }
+}
+document.getElementById('filterMes').addEventListener('change', e=>{
+  filters.mes = e.target.value;
+  atualizarVisualFiltroMes();
+  renderAll();
+});
+
 document.getElementById('clearFilters').addEventListener('click', ()=>{
   filters = { classe:'', status:'', minCusto:null, search:'', mes:'' };
   document.getElementById('filterClass').value = '';
@@ -675,6 +696,7 @@ document.getElementById('clearFilters').addEventListener('click', ()=>{
   document.getElementById('filterMinCusto').value = '';
   document.getElementById('searchBox').value = '';
   document.getElementById('filterMes').value = '';
+  atualizarVisualFiltroMes();
   renderAll();
 });
 
@@ -741,6 +763,17 @@ const elEscala = document.getElementById('escalaTV');
 const btnTV = document.getElementById('tvModeBtn');
 let modoTVAtivo = false;
 
+// Aviso simples que aparece no topo da tela por alguns segundos — usado
+// quando a tela cheia falha, pra a pessoa não ficar sem entender por que
+// o botão "não fez nada" (problema relatado antes desse aviso existir).
+function mostrarAvisoTV(mensagem){
+  const aviso = document.createElement('div');
+  aviso.className = 'aviso-tv';
+  aviso.textContent = mensagem;
+  document.body.appendChild(aviso);
+  setTimeout(()=> aviso.remove(), 6000);
+}
+
 function ajustarEscalaTV(){
   if (!modoTVAtivo) return;
   // Volta ao tamanho normal por um instante só para medir as dimensões
@@ -771,13 +804,20 @@ async function ativarModoTV(){
   btnTV.classList.add('active');
   document.body.style.overflow = 'hidden'; // evita barra de rolagem residual
   try {
+    if (!document.fullscreenEnabled) {
+      // O NAVEGADOR AVISA DE ANTEMÃO que tela cheia está bloqueada (comum
+      // em máquina de empresa, quando o TI desativa isso por política) —
+      // nesse caso nem tentamos, já mostramos o aviso direto.
+      throw new Error('fullscreenEnabled=false (bloqueado pelo navegador/política do sistema)');
+    }
     if (document.documentElement.requestFullscreen) {
       await document.documentElement.requestFullscreen();
     }
   } catch (e) {
-    // Alguns navegadores/políticas de segurança bloqueiam tela cheia
-    // (ex: dentro de um iframe) — nesse caso seguimos só com o ajuste de
-    // escala, que já resolve a maior parte do problema de rolagem.
+    // Antes isso ficava em silêncio total — agora avisamos na tela e no
+    // console (F12), pra dar pra descobrir o motivo exato quando acontece.
+    console.error('[Modo TV] não foi possível entrar em tela cheia:', e);
+    mostrarAvisoTV('Tela cheia bloqueada pelo navegador/computador. Tente apertar F11, ou peça pro TI liberar a permissão de tela cheia.');
   }
   // IMPORTANTE: em alguns navegadores/aparelhos (percebido em notebook e
   // em TV, mas não no monitor testado), o requestFullscreen() "termina"

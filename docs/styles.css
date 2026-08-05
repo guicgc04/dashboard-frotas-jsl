@@ -134,19 +134,25 @@ h1,h2,h3,.font-display{ font-family:var(--font-display); }
 }
 .btn-icon:hover::after{ opacity:1; transform:translateY(0); }
 
-/* Seletor de mês no cabeçalho — filtro global, afeta o dashboard inteiro.
-   Ícone de calendário + select sem rótulo separado, pra ocupar menos
-   espaço visual e não competir com o resto do cabeçalho. */
-.filter-mes-group{
-  display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.14);
-  border-radius:var(--radius-pill); padding:0 12px 0 10px; height:38px;
+/* Seletor de mês no cabeçalho — agora um ícone circular igual aos outros
+   (Exportar, Modo TV), no lado ESQUERDO do cabeçalho, ao lado da logo.
+   O <select> de verdade fica por cima do ícone, do tamanho do círculo
+   inteiro, mas INVISÍVEL (opacity:0) — assim o clique abre o menu nativo
+   de meses normalmente, só que visualmente só aparece o ícone. */
+.icon-mes-wrap{ position:relative; overflow:hidden; }
+.icon-mes-wrap .icon-mes{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  pointer-events:none; width:16px; height:16px; stroke:#fff; fill:none;
+  stroke-width:2; stroke-linecap:round; stroke-linejoin:round;
 }
-.filter-mes-group .icon-mes{ width:16px; height:16px; stroke:#fff; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; opacity:.85; flex:0 0 auto; }
-.filter-mes-group select{
-  font-size:12px; padding:0; border:none; background:transparent; color:#fff;
-  font-family:var(--font-body); cursor:pointer; height:100%; outline:none;
+.icon-mes-wrap select{
+  position:absolute; inset:0; width:100%; height:100%; opacity:0;
+  border:none; cursor:pointer; appearance:none; font-size:12px;
 }
-.filter-mes-group select option{ color:var(--text-dark); }
+/* Quando um mês está selecionado (filtro ativo), o círculo fica destacado
+   em branco — mesmo padrão visual do Modo TV quando ativo. */
+.icon-mes-wrap.tem-filtro{ background:#fff; }
+.icon-mes-wrap.tem-filtro .icon-mes{ stroke:var(--red); }
 
 /* Estado específico do botão "Modo TV" — dois ícones (expandir/sair) que
    alternam via a classe .active, aplicada pelo app.js. */
@@ -158,6 +164,15 @@ h1,h2,h3,.font-display{ font-family:var(--font-display); }
 
 /* Contêiner que recebe o transform:scale() do Modo TV — ver ativarModoTV() em app.js */
 #escalaTV{ transform-origin:top left; }
+
+/* Aviso "tela cheia bloqueada" — ver mostrarAvisoTV() em app.js */
+.aviso-tv{
+  position:fixed; top:16px; left:50%; transform:translateX(-50%); z-index:9999;
+  background:var(--text-dark); color:#fff; padding:12px 22px; border-radius:var(--radius-pill);
+  font-family:var(--font-body); font-size:13px; font-weight:600; max-width:90vw; text-align:center;
+  box-shadow:0 10px 30px rgba(0,0,0,.3);
+}
+
 
 
 /* ============================================================================
