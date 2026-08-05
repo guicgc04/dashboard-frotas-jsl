@@ -779,7 +779,17 @@ async function ativarModoTV(){
     // (ex: dentro de um iframe) — nesse caso seguimos só com o ajuste de
     // escala, que já resolve a maior parte do problema de rolagem.
   }
-  ajustarEscalaTV();
+  // IMPORTANTE: em alguns navegadores/aparelhos (percebido em notebook e
+  // em TV, mas não no monitor testado), o requestFullscreen() "termina"
+  // (a Promise resolve) ANTES da tela realmente mudar de tamanho — ou
+  // seja, se calcularmos o zoom exatamente aqui, window.innerHeight/
+  // innerWidth ainda podem estar com o tamanho ANTIGO (de fora da tela
+  // cheia), e o cálculo sai errado (fica do tamanho normal, sem esticar).
+  // Por isso recalculamos em 3 momentos diferentes, pra garantir que pelo
+  // menos um deles pegue as dimensões já atualizadas:
+  ajustarEscalaTV();                  // tentativa imediata
+  setTimeout(ajustarEscalaTV, 150);   // reforço logo em seguida
+  setTimeout(ajustarEscalaTV, 500);   // reforço final, para aparelhos mais lentos
 }
 
 function desativarModoTV(){
@@ -795,11 +805,17 @@ btnTV.addEventListener('click', ()=>{
   if (modoTVAtivo) desativarModoTV(); else ativarModoTV();
 });
 
-// Se a pessoa sair da tela cheia apertando ESC (sem clicar no botão de
-// novo), desliga o Modo TV também — senão o zoom ficaria aplicado sem
-// mais fazer sentido fora da tela cheia.
+// O navegador dispara "fullscreenchange" tanto ao ENTRAR quanto ao SAIR
+// da tela cheia — e é exatamente nesse evento que window.innerHeight/
+// innerWidth já refletem o tamanho definitivo da tela. Por isso é aqui
+// (e não só logo após o requestFullscreen()) que recalculamos o zoom de
+// verdade. Também é aqui que detectamos saída manual (tecla Esc).
 document.addEventListener('fullscreenchange', ()=>{
-  if (!document.fullscreenElement && modoTVAtivo) desativarModoTV();
+  if (document.fullscreenElement && modoTVAtivo) {
+    ajustarEscalaTV();
+  } else if (!document.fullscreenElement && modoTVAtivo) {
+    desativarModoTV();
+  }
 });
 
 // Reajusta a escala se a janela/tela mudar de tamanho (ex: trocar de

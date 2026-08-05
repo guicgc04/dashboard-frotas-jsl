@@ -109,13 +109,30 @@ h1,h2,h3,.font-display{ font-family:var(--font-display); }
 .header-right .meta .label{ font-size:9.5px; font-weight:700; opacity:.85; letter-spacing:.4px; white-space:nowrap; }
 .header-right .meta .value{ font-size:12px; font-weight:600; white-space:nowrap; }
 
-/* Botão "Exportar base completa (.csv)" — dispara downloadCSV() em app.js */
-.btn-export{
-  background:#fff; color:var(--red); border:none; padding:0 16px; height:38px; border-radius:var(--radius-pill);
-  font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;
-  font-family:var(--font-display); box-shadow:0 4px 10px rgba(0,0,0,.12); transition:transform .12s;
+/* Botões-ícone do cabeçalho (Exportar, Modo TV) — mesmo visual: círculo
+   discreto, com uma legenda escura aparecendo ao passar o mouse (tooltip
+   customizado via CSS, não o balão feio padrão do navegador). O texto da
+   legenda vem do atributo data-tooltip de cada botão no HTML. */
+.btn-icon{
+  position:relative;
+  background:rgba(255,255,255,.14); color:#fff; border:none;
+  width:38px; height:38px; border-radius:50%; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+  transition:background .15s;
 }
-.btn-export:hover{ transform:translateY(-1px); box-shadow:0 6px 14px rgba(0,0,0,.16); }
+.btn-icon:hover{ background:rgba(255,255,255,.28); }
+.btn-icon svg{ width:17px; height:17px; stroke:#fff; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+.btn-icon::after{
+  content:attr(data-tooltip);
+  position:absolute; top:calc(100% + 10px); right:0;
+  background:var(--text-dark); color:#fff; font-size:11px; font-weight:600; white-space:nowrap;
+  padding:7px 12px; border-radius:8px; box-shadow:0 6px 16px rgba(0,0,0,.22);
+  opacity:0; pointer-events:none; transform:translateY(-4px);
+  transition:opacity .15s, transform .15s; z-index:30;
+  font-family:var(--font-body); text-transform:none; letter-spacing:0;
+}
+.btn-icon:hover::after{ opacity:1; transform:translateY(0); }
 
 /* Seletor de mês no cabeçalho — filtro global, afeta o dashboard inteiro.
    Ícone de calendário + select sem rótulo separado, pra ocupar menos
@@ -131,18 +148,9 @@ h1,h2,h3,.font-display{ font-family:var(--font-display); }
 }
 .filter-mes-group select option{ color:var(--text-dark); }
 
-/* Botão "Modo TV" — agora só ícone, sem texto, pra ficar mais discreto e
-   limpo no cabeçalho. O título (tooltip) ainda explica a função ao passar
-   o mouse. Dois ícones (expandir/sair) alternam via a classe .active. */
-.btn-tv{
-  background:rgba(255,255,255,.14); color:#fff; border:none;
-  width:38px; height:38px; border-radius:50%; cursor:pointer;
-  display:flex; align-items:center; justify-content:center; flex:0 0 auto;
-  transition:background .15s;
-}
-.btn-tv:hover{ background:rgba(255,255,255,.28); }
+/* Estado específico do botão "Modo TV" — dois ícones (expandir/sair) que
+   alternam via a classe .active, aplicada pelo app.js. */
 .btn-tv.active{ background:#fff; }
-.btn-tv svg{ width:17px; height:17px; stroke:#fff; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 .btn-tv.active svg{ stroke:var(--red); }
 .btn-tv .icon-exit{ display:none; }
 .btn-tv.active .icon-expand{ display:none; }
