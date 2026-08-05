@@ -726,17 +726,16 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
 /* ============================================================================
    16. MODO TV
    Pensado para exibir o dashboard numa TV/monitor junto com outros
-   indicadores, sem precisar rolar a página (pedido explícito: "está
-   quebrando e temos que rolar pra ver o resto"). Faz duas coisas ao clicar
-   no botão "Modo TV" do cabeçalho:
+   indicadores. Faz duas coisas ao clicar no botão "Modo TV" do cabeçalho:
      1) Pede tela cheia ao navegador (Fullscreen API) — some com a barra de
-        endereço/abas, ganhando espaço vertical extra.
+        endereço/abas, ganhando espaço extra.
      2) Aplica um transform:scale() em todo o conteúdo (#escalaTV),
-        calculado na hora para que a altura total do dashboard caiba
-        exatamente na altura da tela disponível — sem cortar nada e sem
-        precisar rolar. Reajusta sozinho se a janela for redimensionada.
-   Não reduz nem esconde nenhum bloco — só encolhe visualmente tudo junto,
-   proporcionalmente, até caber inteiro na tela.
+        calculado para PREENCHER a tela disponível — tanto encolhendo
+        (quando o conteúdo não cabe, evitando rolagem) quanto AUMENTANDO
+        (quando sobra espaço, ex: numa TV grande de 65", onde o dashboard
+        no tamanho "normal" ficaria pequeno demais pra ler de longe).
+   O ícone do botão troca sozinho (expandir ↔ sair) via a classe .active
+   no CSS — não mexemos em texto nenhum aqui.
    ============================================================================ */
 const elEscala = document.getElementById('escalaTV');
 const btnTV = document.getElementById('tvModeBtn');
@@ -744,27 +743,32 @@ let modoTVAtivo = false;
 
 function ajustarEscalaTV(){
   if (!modoTVAtivo) return;
-  // Volta ao tamanho normal por um instante só para medir a altura real do
-  // conteúdo sem escala nenhuma aplicada — não dá pra medir corretamente
-  // um elemento que já está encolhido.
+  // Volta ao tamanho normal por um instante só para medir as dimensões
+  // reais do conteúdo sem escala nenhuma aplicada.
   elEscala.style.transform = 'none';
   elEscala.style.width = '';
-  const alturaConteudo = elEscala.scrollHeight;
-  const alturaDisponivel = window.innerHeight;
-  // Nunca aumenta (max 1×) — só encolhe quando o conteúdo é mais alto que
-  // a tela; se já couber, fica do tamanho normal.
-  const fator = Math.min(1, alturaDisponivel / alturaConteudo);
+  const larguraConteudo = elEscala.scrollWidth;
+  const alturaConteudo  = elEscala.scrollHeight;
+
+  // "Fator de encaixe": a MENOR das duas proporções (largura e altura)
+  // — isso garante que o conteúdo preencha o máximo possível da tela,
+  // em qualquer sentido, sem esticar/cortar nada. Ao contrário da versão
+  // anterior, aqui NÃO limitamos a 1× — numa TV grande, isso deixa o
+  // dashboard maior (preenchendo a tela), não só do tamanho original.
+  const fatorLargura = window.innerWidth  / larguraConteudo;
+  const fatorAltura   = window.innerHeight / alturaConteudo;
+  const fator = Math.min(fatorLargura, fatorAltura);
+
   elEscala.style.transform = `scale(${fator})`;
-  // Como o scale() encolhe a LARGURA junto, compensamos alargando a caixa
-  // na mesma proporção inversa — assim o conteúdo continua preenchendo a
-  // largura da tela de ponta a ponta, só menor.
+  // Compensa a largura na proporção inversa, pra continuar preenchendo
+  // a tela de ponta a ponta depois do scale() (que encolhe/aumenta a
+  // largura visual junto com a altura).
   elEscala.style.width = (100/fator) + '%';
 }
 
 async function ativarModoTV(){
   modoTVAtivo = true;
   btnTV.classList.add('active');
-  btnTV.textContent = '⛶ Sair do Modo TV';
   document.body.style.overflow = 'hidden'; // evita barra de rolagem residual
   try {
     if (document.documentElement.requestFullscreen) {
@@ -781,7 +785,6 @@ async function ativarModoTV(){
 function desativarModoTV(){
   modoTVAtivo = false;
   btnTV.classList.remove('active');
-  btnTV.textContent = '⛶ Modo TV';
   document.body.style.overflow = '';
   elEscala.style.transform = 'none';
   elEscala.style.width = '';

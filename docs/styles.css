@@ -105,35 +105,48 @@ h1,h2,h3,.font-display{ font-family:var(--font-display); }
 .header-title{ grid-column:2; text-align:center; }
 .header h1{ font-size:22px; margin:0; font-weight:700; letter-spacing:.2px; white-space:nowrap; }
 
-.header-right{ text-align:right; display:flex; align-items:center; gap:16px; justify-self:end; }
-.header-right .meta .label{ font-size:10px; font-weight:700; opacity:.85; letter-spacing:.4px; white-space:nowrap; }
-.header-right .meta .value{ font-size:12.5px; font-weight:600; white-space:nowrap; }
+.header-right{ text-align:right; display:flex; align-items:center; gap:12px; justify-self:end; }
+.header-right .meta .label{ font-size:9.5px; font-weight:700; opacity:.85; letter-spacing:.4px; white-space:nowrap; }
+.header-right .meta .value{ font-size:12px; font-weight:600; white-space:nowrap; }
 
 /* Botão "Exportar base completa (.csv)" — dispara downloadCSV() em app.js */
 .btn-export{
-  background:#fff; color:var(--red); border:none; padding:10px 18px; border-radius:var(--radius-pill);
-  font-size:12.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;
+  background:#fff; color:var(--red); border:none; padding:0 16px; height:38px; border-radius:var(--radius-pill);
+  font-size:12px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap;
   font-family:var(--font-display); box-shadow:0 4px 10px rgba(0,0,0,.12); transition:transform .12s;
 }
 .btn-export:hover{ transform:translateY(-1px); box-shadow:0 6px 14px rgba(0,0,0,.16); }
 
-/* Seletor de mês no cabeçalho — filtro global, afeta o dashboard inteiro */
-.filter-mes-group{ display:flex; align-items:center; gap:6px; }
-.filter-mes-group label{ font-size:10px; font-weight:700; color:#fff; opacity:.9; letter-spacing:.4px; white-space:nowrap; }
-.filter-mes-group select{
-  font-size:12px; padding:6px 10px; border-radius:var(--radius-pill); border:none;
-  background:#fff; color:var(--text-dark); font-family:var(--font-body); cursor:pointer;
+/* Seletor de mês no cabeçalho — filtro global, afeta o dashboard inteiro.
+   Ícone de calendário + select sem rótulo separado, pra ocupar menos
+   espaço visual e não competir com o resto do cabeçalho. */
+.filter-mes-group{
+  display:flex; align-items:center; gap:6px; background:rgba(255,255,255,.14);
+  border-radius:var(--radius-pill); padding:0 12px 0 10px; height:38px;
 }
+.filter-mes-group .icon-mes{ width:16px; height:16px; stroke:#fff; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; opacity:.85; flex:0 0 auto; }
+.filter-mes-group select{
+  font-size:12px; padding:0; border:none; background:transparent; color:#fff;
+  font-family:var(--font-body); cursor:pointer; height:100%; outline:none;
+}
+.filter-mes-group select option{ color:var(--text-dark); }
 
-/* Botão "Modo TV" — tela cheia + ajuste de escala pra caber tudo sem rolar (ver app.js) */
+/* Botão "Modo TV" — agora só ícone, sem texto, pra ficar mais discreto e
+   limpo no cabeçalho. O título (tooltip) ainda explica a função ao passar
+   o mouse. Dois ícones (expandir/sair) alternam via a classe .active. */
 .btn-tv{
-  background:rgba(255,255,255,.15); color:#fff; border:1.5px solid rgba(255,255,255,.6);
-  padding:9px 16px; border-radius:var(--radius-pill); font-size:12.5px; font-weight:700; cursor:pointer;
-  display:flex; align-items:center; gap:6px; white-space:nowrap; font-family:var(--font-display);
+  background:rgba(255,255,255,.14); color:#fff; border:none;
+  width:38px; height:38px; border-radius:50%; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; flex:0 0 auto;
   transition:background .15s;
 }
 .btn-tv:hover{ background:rgba(255,255,255,.28); }
-.btn-tv.active{ background:#fff; color:var(--red); }
+.btn-tv.active{ background:#fff; }
+.btn-tv svg{ width:17px; height:17px; stroke:#fff; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.btn-tv.active svg{ stroke:var(--red); }
+.btn-tv .icon-exit{ display:none; }
+.btn-tv.active .icon-expand{ display:none; }
+.btn-tv.active .icon-exit{ display:block; }
 
 /* Contêiner que recebe o transform:scale() do Modo TV — ver ativarModoTV() em app.js */
 #escalaTV{ transform-origin:top left; }
