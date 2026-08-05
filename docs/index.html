@@ -14,7 +14,7 @@
 </head>
 <body>
 
-<div class="page">
+<div class="page" id="escalaTV">
 
   <!-- ==========================================================================
        CABEÇALHO
@@ -29,11 +29,16 @@
     <h1>Dashboard de Frotas</h1>
   </div>
   <div class="header-right">
+    <div class="filter-mes-group">
+      <label for="filterMes">Mês</label>
+      <select id="filterMes"><option value="">Todos</option></select>
+    </div>
     <div class="meta">
       <div class="label">ÚLTIMA ATUALIZAÇÃO</div>
-      <div class="value" id="lastUpdate">03/08/2026 16:08</div>
+      <div class="value" id="lastUpdate">05/08/2026 16:03</div>
     </div>
     <button class="btn-export" id="exportBtn">⬇ Exportar base completa (.csv)</button>
+    <button class="btn-tv" id="tvModeBtn" title="Tela cheia, ajustada pra caber tudo sem rolar — ideal pra TV">⛶ Modo TV</button>
   </div>
 </div>
 

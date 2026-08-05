@@ -117,6 +117,27 @@ h1,h2,h3,.font-display{ font-family:var(--font-display); }
 }
 .btn-export:hover{ transform:translateY(-1px); box-shadow:0 6px 14px rgba(0,0,0,.16); }
 
+/* Seletor de mês no cabeçalho — filtro global, afeta o dashboard inteiro */
+.filter-mes-group{ display:flex; align-items:center; gap:6px; }
+.filter-mes-group label{ font-size:10px; font-weight:700; color:#fff; opacity:.9; letter-spacing:.4px; white-space:nowrap; }
+.filter-mes-group select{
+  font-size:12px; padding:6px 10px; border-radius:var(--radius-pill); border:none;
+  background:#fff; color:var(--text-dark); font-family:var(--font-body); cursor:pointer;
+}
+
+/* Botão "Modo TV" — tela cheia + ajuste de escala pra caber tudo sem rolar (ver app.js) */
+.btn-tv{
+  background:rgba(255,255,255,.15); color:#fff; border:1.5px solid rgba(255,255,255,.6);
+  padding:9px 16px; border-radius:var(--radius-pill); font-size:12.5px; font-weight:700; cursor:pointer;
+  display:flex; align-items:center; gap:6px; white-space:nowrap; font-family:var(--font-display);
+  transition:background .15s;
+}
+.btn-tv:hover{ background:rgba(255,255,255,.28); }
+.btn-tv.active{ background:#fff; color:var(--red); }
+
+/* Contêiner que recebe o transform:scale() do Modo TV — ver ativarModoTV() em app.js */
+#escalaTV{ transform-origin:top left; }
+
 
 /* ============================================================================
    4. FILTROS

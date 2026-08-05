@@ -24,8 +24,9 @@
     13. EVENTOS DE ORDENAÇÃO DA TABELA (clique no cabeçalho)
     14. EVENTOS DOS FILTROS (inputs/selects da barra de filtro)
     15. EXPORTAÇÃO PARA CSV (botão "Exportar base completa")
-    16. renderAll() — o "maestro" que re-desenha tudo a cada mudança de filtro
-    17. INICIALIZAÇÃO — primeira renderização ao carregar a página
+    16. MODO TV (tela cheia + escala automática, botão "Modo TV" no cabeçalho)
+    17. renderAll() — o "maestro" que re-desenha tudo a cada mudança de filtro
+    18. INICIALIZAÇÃO — primeira renderização ao carregar a página
    ============================================================================ */
 
 
@@ -98,7 +99,8 @@ const fleet = FLEET_RAW.map(f => ({
 let sortKey = 'custo';   // coluna atualmente usada para ordenar a tabela
 let sortDir = -1;        // -1 = decrescente, 1 = crescente
 let activeIdx = null;    // código da frota selecionada no painel de detalhe
-let filters = { classe:'', status:'', minCusto:null, search:'' };
+let selecaoManual = false; // true depois que o usuário clica em alguma linha (controla o texto de dica do painel)
+let filters = { classe:'', status:'', minCusto:null, search:'', mes:'' };
 
 
 /* ============================================================================
@@ -125,30 +127,68 @@ function hideTooltip(){ tooltip.classList.remove('show'); }
 /* ============================================================================
    5. FILTROS
    Um único conjunto de filtros (objeto `filters`) afeta simultaneamente:
-   KPIs, gráfico de custo, donut de causa raiz, rankings e a tabela de frotas.
+   KPIs, gráfico de custo, donut de causa raiz, rankings, tabela de frotas
+   e o painel de detalhe.
    ============================================================================ */
 
-// Retorna só as frotas que passam nos filtros ativos (status / custo mínimo /
-// classificação / busca por texto). Usada como primeiro passo de renderAll().
-function applyFilters(list){
-  return list.filter(f=>{
-    if (filters.status && f.status !== filters.status) return false;
-    if (filters.minCusto && f.custo < filters.minCusto) return false;
-    if (filters.classe && !(f.classes[filters.classe] > 0)) return false;
-    const q = filters.search;
-    if (q && !(f.frota.toLowerCase().includes(q) ||
-               (f.modeloDisplay||'').toLowerCase().includes(q) ||
-               (f.marcaDisplay||'').toLowerCase().includes(q))) return false;
+// "dd/mm/aaaa" -> "aaaa-mm" (usado para comparar com o filtro de mês)
+function mesDoRegistro(dataStr){
+  const partes = (dataStr||'').split('/');
+  if (partes.length !== 3) return null;
+  return partes[2] + '-' + partes[1];
+}
+
+// Lista de meses realmente presentes na base (calculada uma vez a partir
+// dos dados, não fixa) — usada para preencher o <select> do filtro de mês.
+function mesesDisponiveis(){
+  const set = new Set();
+  fleet.forEach(f => f.hist.forEach(h => {
+    const m = mesDoRegistro(h.data);
+    if (m) set.add(m);
+  }));
+  return [...set].sort();
+}
+
+const NOME_MES = {'01':'jan','02':'fev','03':'mar','04':'abr','05':'mai','06':'jun',
+                   '07':'jul','08':'ago','09':'set','10':'out','11':'nov','12':'dez'};
+
+// Filtra o histórico de UMA frota pela Classificação e/ou Mês ativos —
+// usada por praticamente todo o dashboard (gráfico de custo, donut,
+// rankings, KPIs e painel de detalhe), garantindo que todos concordem
+// entre si sobre o que está "dentro do filtro".
+function filteredHist(f){
+  return f.hist.filter(h=>{
+    if (filters.classe && h.tipo !== filters.classe) return false;
+    if (filters.mes && mesDoRegistro(h.data) !== filters.mes) return false;
     return true;
   });
 }
 
-// Dentro de uma frota, filtra o histórico de avarias/custo pela
-// classificação selecionada (usado pelo gráfico de custo e pelo donut,
-// para que ambos reajam ao filtro "Classificação" do bloco Causa Raiz).
-function filteredHist(f){
-  if (!filters.classe) return f.hist;
-  return f.hist.filter(h=>h.tipo === filters.classe);
+// Retorna só as frotas que passam nos filtros ativos (status / custo mínimo /
+// classificação / mês / busca por texto). Frotas que sobrevivem ao filtro
+// vêm de volta com "custo" e "count" RECALCULADOS a partir do histórico já
+// filtrado — assim a tabela e os KPIs mostram o total certo pro período
+// selecionado, não o total histórico completo da frota.
+function applyFilters(list){
+  const resultado = [];
+  for (const f of list) {
+    if (filters.status && f.status !== filters.status) continue;
+
+    const q = filters.search;
+    if (q && !(f.frota.toLowerCase().includes(q) ||
+               (f.modeloDisplay||'').toLowerCase().includes(q) ||
+               (f.marcaDisplay||'').toLowerCase().includes(q))) continue;
+
+    const histFiltrado = filteredHist(f);
+    if ((filters.classe || filters.mes) && histFiltrado.length === 0) continue;
+
+    const custo = histFiltrado.reduce((s,h)=>s+h.valor, 0);
+    const count = histFiltrado.length;
+    if (filters.minCusto && custo < filters.minCusto) continue;
+
+    resultado.push({ ...f, custo, count });
+  }
+  return resultado;
 }
 
 // Desenha os "chips" removíveis (ex: "Classificação: Mau uso ✕") que
@@ -159,6 +199,10 @@ function renderActiveTags(){
   if (filters.classe) tags.push(['Classificação: '+filters.classe, ()=>{document.getElementById('filterClass').value='';filters.classe='';renderAll();}]);
   if (filters.status) tags.push(['Status: '+statusLabel[filters.status], ()=>{document.getElementById('filterStatus').value='';filters.status='';renderAll();}]);
   if (filters.minCusto) tags.push(['Custo ≥ R$ '+filters.minCusto, ()=>{document.getElementById('filterMinCusto').value='';filters.minCusto=null;renderAll();}]);
+  if (filters.mes) {
+    const [ano,mes] = filters.mes.split('-');
+    tags.push(['Mês: '+NOME_MES[mes]+'/'+ano, ()=>{document.getElementById('filterMes').value='';filters.mes='';renderAll();}]);
+  }
   box.innerHTML = tags.map(([label,_],i)=>`<span class="active-filter-tag" data-i="${i}">${label}<button>✕</button></span>`).join('');
   box.querySelectorAll('.active-filter-tag').forEach((el,i)=>{
     el.querySelector('button').addEventListener('click', tags[i][1]);
@@ -172,13 +216,34 @@ function renderActiveTags(){
    Ocorrências "Mau Uso" e Custo Total Acumulado. Todos recalculados a
    partir do array `data` já filtrado (recebido de renderAll()).
    ============================================================================ */
+// Texto "no período ..." do KPI de Registros — mostra o mês selecionado
+// no filtro, ou a faixa completa de meses presentes na base quando não
+// há filtro de mês ativo (calculada a partir dos dados, não fixa no código).
+function textoDoPeriodo(){
+  if (filters.mes) {
+    const [ano,mes] = filters.mes.split('-');
+    return `no período ${NOME_MES[mes]}/${ano}`;
+  }
+  const meses = mesesDisponiveis();
+  if (meses.length === 0) return 'sem período de dados';
+  const primeiro = meses[0], ultimo = meses[meses.length-1];
+  const [a1,m1] = primeiro.split('-'), [a2,m2] = ultimo.split('-');
+  return `no período ${NOME_MES[m1]}–${NOME_MES[m2]}/${a2}`;
+}
+
 function renderKpis(data){
   const totalCusto = data.reduce((s,f)=>s+f.custo,0);
-  // Se houver filtro de classificação ativo, conta só os registros daquela
-  // classe; senão conta todos os registros de custo/avaria da frota.
-  const totalReg   = data.reduce((s,f)=>s+ (filters.classe ? (f.classes[filters.classe]||0) : f.count), 0);
-  const totalMau   = data.reduce((s,f)=>s+(f.classes['Mau uso']||0), 0);
-  const totalPrev  = data.reduce((s,f)=>s+(f.classes['Preventiva']||0), 0);
+  const totalReg   = data.reduce((s,f)=>s+f.count,0);
+  // Mau uso e Preventiva precisam olhar o histórico já filtrado (por
+  // Classificação e/ou Mês) — f.classes é um total histórico fixo, não
+  // filtrado, então não serve mais aqui.
+  let totalMau = 0, totalPrev = 0;
+  data.forEach(f=>{
+    filteredHist(f).forEach(h=>{
+      if (h.tipo === 'Mau uso') totalMau++;
+      if (h.tipo === 'Preventiva') totalPrev++;
+    });
+  });
 
   document.getElementById('kpiRow').innerHTML = `
     <div class="card kpi-card">
@@ -194,7 +259,7 @@ function renderKpis(data){
       <div class="kpi-body">
         <div class="label">Registros de Custo/Avaria</div>
         <div class="big">${totalReg}</div>
-        <div class="delta">no período Fev–Jul/2026</div>
+        <div class="delta">${textoDoPeriodo()}</div>
       </div>
     </div>
     <div class="card kpi-card">
@@ -507,7 +572,7 @@ function renderFleetTable(data){
       <td>${f.count}</td>
       <td>R$ ${fmtBRL(f.custo)}</td>
     `;
-    tr.addEventListener('click', ()=>openDetail(f, tr)); // abre o painel de detalhe (seção 12)
+    tr.addEventListener('click', ()=>{ selecaoManual = true; openDetail(f, tr); }); // abre o painel de detalhe (seção 12)
     body.appendChild(tr);
   });
 }
@@ -530,15 +595,22 @@ function openDetail(f, tr){
   document.getElementById('detFrota').textContent = 'Frota ' + f.frota;
   document.getElementById('detModelo').textContent =
     (f.modelo ? `${f.modelo} · ${f.marca||''} · ${f.ano||''} · Chassi ${f.chassi||'—'}` : 'Sem dados cadastrais vinculados nesta prévia');
-  document.getElementById('detailHint').textContent = tr
+  document.getElementById('detailHint').textContent = selecaoManual
     ? 'clique em outra linha na tabela para trocar de frota'
     : 'mostrando a frota de maior custo acumulado — clique em outra linha na tabela para ver os detalhes dela';
 
-  // Mini-cards: custo acumulado, nº de registros, mau uso, preventiva, horímetro
-  document.getElementById('detCusto').textContent = 'R$ ' + fmtBRL(f.custo);
-  document.getElementById('detCount').textContent = f.count;
-  document.getElementById('detMau').textContent   = f.classes['Mau uso']   || 0;
-  document.getElementById('detPrev').textContent  = f.classes['Preventiva'] || 0;
+  // Mini-cards: custo acumulado, nº de registros, mau uso, preventiva —
+  // calculados a partir do histórico já filtrado (mês/classificação
+  // ativos), pra este painel concordar com o resto da tela.
+  const histFiltrado = filteredHist(f);
+  const custoFiltrado = histFiltrado.reduce((s,h)=>s+h.valor, 0);
+  const mauFiltrado  = histFiltrado.filter(h=>h.tipo==='Mau uso').length;
+  const prevFiltrado = histFiltrado.filter(h=>h.tipo==='Preventiva').length;
+
+  document.getElementById('detCusto').textContent = 'R$ ' + fmtBRL(custoFiltrado);
+  document.getElementById('detCount').textContent = histFiltrado.length;
+  document.getElementById('detMau').textContent   = mauFiltrado;
+  document.getElementById('detPrev').textContent  = prevFiltrado;
   const cardHorimetro = document.getElementById('detHorimetro').closest('.mini-card');
   document.getElementById('detHorimetro').textContent = f.horimetroAtual
     ? `${f.horimetroAtual.valor.toLocaleString('pt-BR')} h (${f.horimetroAtual.data})`
@@ -559,14 +631,14 @@ function openDetail(f, tr){
     pg.innerHTML = `<div class="mini-card nodata" style="grid-column:1/-1;"><div class="k">Preventiva</div><div class="v">Sem dado real cruzado para esta frota em Preventiva_-_Gru.csv (código de frota não encontrado no relatório do SISMA).</div></div>`;
   }
 
-  // Histórico recente de avarias/custo (mais novo primeiro, já vem assim do Python)
-  document.getElementById('histBody').innerHTML = f.hist.map(h=>`
+  // Histórico (já filtrado por mês/classificação, mais novo primeiro)
+  document.getElementById('histBody').innerHTML = histFiltrado.length ? histFiltrado.map(h=>`
     <tr>
       <td>${h.data}</td>
       <td><span class="badge ${CLASS_BADGE[h.tipo]||''}">${h.tipo}</span></td>
       <td title="${(h.material||'').replace(/"/g,'&quot;')}">${h.material||''}</td>
       <td>R$ ${fmtBRL(h.valor)}</td>
-    </tr>`).join('');
+    </tr>`).join('') : '<tr class="empty-row"><td colspan="4">Nenhum registro para os filtros atuais.</td></tr>';
 }
 
 
@@ -595,12 +667,14 @@ document.getElementById('filterClass').addEventListener('change', e=>{ filters.c
 document.getElementById('filterStatus').addEventListener('change', e=>{ filters.status = e.target.value; renderAll(); });
 document.getElementById('filterMinCusto').addEventListener('input', e=>{ filters.minCusto = e.target.value ? parseFloat(e.target.value) : null; renderAll(); });
 document.getElementById('searchBox').addEventListener('input', e=>{ filters.search = e.target.value.trim().toLowerCase(); renderAll(); });
+document.getElementById('filterMes').addEventListener('change', e=>{ filters.mes = e.target.value; renderAll(); });
 document.getElementById('clearFilters').addEventListener('click', ()=>{
-  filters = { classe:'', status:'', minCusto:null, search:'' };
+  filters = { classe:'', status:'', minCusto:null, search:'', mes:'' };
   document.getElementById('filterClass').value = '';
   document.getElementById('filterStatus').value = '';
   document.getElementById('filterMinCusto').value = '';
   document.getElementById('searchBox').value = '';
+  document.getElementById('filterMes').value = '';
   renderAll();
 });
 
@@ -650,7 +724,88 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
 
 
 /* ============================================================================
-   16. renderAll() — "MAESTRO" DA RENDERIZAÇÃO
+   16. MODO TV
+   Pensado para exibir o dashboard numa TV/monitor junto com outros
+   indicadores, sem precisar rolar a página (pedido explícito: "está
+   quebrando e temos que rolar pra ver o resto"). Faz duas coisas ao clicar
+   no botão "Modo TV" do cabeçalho:
+     1) Pede tela cheia ao navegador (Fullscreen API) — some com a barra de
+        endereço/abas, ganhando espaço vertical extra.
+     2) Aplica um transform:scale() em todo o conteúdo (#escalaTV),
+        calculado na hora para que a altura total do dashboard caiba
+        exatamente na altura da tela disponível — sem cortar nada e sem
+        precisar rolar. Reajusta sozinho se a janela for redimensionada.
+   Não reduz nem esconde nenhum bloco — só encolhe visualmente tudo junto,
+   proporcionalmente, até caber inteiro na tela.
+   ============================================================================ */
+const elEscala = document.getElementById('escalaTV');
+const btnTV = document.getElementById('tvModeBtn');
+let modoTVAtivo = false;
+
+function ajustarEscalaTV(){
+  if (!modoTVAtivo) return;
+  // Volta ao tamanho normal por um instante só para medir a altura real do
+  // conteúdo sem escala nenhuma aplicada — não dá pra medir corretamente
+  // um elemento que já está encolhido.
+  elEscala.style.transform = 'none';
+  elEscala.style.width = '';
+  const alturaConteudo = elEscala.scrollHeight;
+  const alturaDisponivel = window.innerHeight;
+  // Nunca aumenta (max 1×) — só encolhe quando o conteúdo é mais alto que
+  // a tela; se já couber, fica do tamanho normal.
+  const fator = Math.min(1, alturaDisponivel / alturaConteudo);
+  elEscala.style.transform = `scale(${fator})`;
+  // Como o scale() encolhe a LARGURA junto, compensamos alargando a caixa
+  // na mesma proporção inversa — assim o conteúdo continua preenchendo a
+  // largura da tela de ponta a ponta, só menor.
+  elEscala.style.width = (100/fator) + '%';
+}
+
+async function ativarModoTV(){
+  modoTVAtivo = true;
+  btnTV.classList.add('active');
+  btnTV.textContent = '⛶ Sair do Modo TV';
+  document.body.style.overflow = 'hidden'; // evita barra de rolagem residual
+  try {
+    if (document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen();
+    }
+  } catch (e) {
+    // Alguns navegadores/políticas de segurança bloqueiam tela cheia
+    // (ex: dentro de um iframe) — nesse caso seguimos só com o ajuste de
+    // escala, que já resolve a maior parte do problema de rolagem.
+  }
+  ajustarEscalaTV();
+}
+
+function desativarModoTV(){
+  modoTVAtivo = false;
+  btnTV.classList.remove('active');
+  btnTV.textContent = '⛶ Modo TV';
+  document.body.style.overflow = '';
+  elEscala.style.transform = 'none';
+  elEscala.style.width = '';
+  if (document.fullscreenElement) document.exitFullscreen();
+}
+
+btnTV.addEventListener('click', ()=>{
+  if (modoTVAtivo) desativarModoTV(); else ativarModoTV();
+});
+
+// Se a pessoa sair da tela cheia apertando ESC (sem clicar no botão de
+// novo), desliga o Modo TV também — senão o zoom ficaria aplicado sem
+// mais fazer sentido fora da tela cheia.
+document.addEventListener('fullscreenchange', ()=>{
+  if (!document.fullscreenElement && modoTVAtivo) desativarModoTV();
+});
+
+// Reajusta a escala se a janela/tela mudar de tamanho (ex: trocar de
+// monitor, ou o próprio navegador entrar/sair da tela cheia).
+window.addEventListener('resize', ajustarEscalaTV);
+
+
+/* ============================================================================
+   17. renderAll() — "MAESTRO" DA RENDERIZAÇÃO
    Chamado sempre que qualquer filtro muda. Recalcula a lista filtrada UMA
    vez (applyFilters) e passa para todos os blocos, garantindo que KPIs,
    gráficos e tabela fiquem sempre consistentes entre si.
@@ -665,15 +820,34 @@ function renderAll(){
   renderClassChart(data);// Bloco Causa Raiz — donut
   renderRankings(data);  // Bloco Causa Raiz — rankings
   renderFleetTable(data);// Bloco Preventiva x Corretiva — tabela
+
+  // Mantém o painel de detalhe (frota aberta) coerente com os filtros —
+  // sem isso, ele continuaria mostrando o total histórico completo mesmo
+  // depois de aplicar um filtro de mês/classificação.
+  const frotaAberta = fleet.find(f => f.frota === activeIdx);
+  if (frotaAberta) openDetail(frotaAberta, null);
+
+  ajustarEscalaTV(); // a altura do conteúdo pode mudar a cada render (ex: histórico com mais/menos linhas)
 }
 
 
 /* ============================================================================
-   17. INICIALIZAÇÃO
+   18. INICIALIZAÇÃO
    Roda uma única vez, ao carregar a página:
-     1) seleciona por padrão a frota de maior custo acumulado no painel de detalhe
-     2) faz a primeira renderização completa do dashboard
+     1) preenche as opções do filtro de mês com os meses que existem de
+        verdade na base (calculado dos dados, não uma lista fixa)
+     2) seleciona por padrão a frota de maior custo acumulado no painel de detalhe
+     3) faz a primeira renderização completa do dashboard
    ============================================================================ */
+const selectMes = document.getElementById('filterMes');
+mesesDisponiveis().forEach(m=>{
+  const [ano,mes] = m.split('-');
+  const opt = document.createElement('option');
+  opt.value = m;
+  opt.textContent = `${NOME_MES[mes]}/${ano}`;
+  selectMes.appendChild(opt);
+});
+
 const topFrota = fleet.slice().sort((a,b)=>b.custo-a.custo)[0];
 if (topFrota) { activeIdx = topFrota.frota; openDetail(topFrota, null); }
 
