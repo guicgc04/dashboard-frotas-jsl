@@ -774,45 +774,59 @@ function mostrarAvisoTV(mensagem){
   setTimeout(()=> aviso.remove(), 6000);
 }
 
+// Largura "de projeto" do dashboard — o mesmo valor de max-width usado
+// em .page (ver styles.css). Fixar nisso durante a medição é o que
+// resolve o bug real: como o layout é responsivo, sem isso ele se
+// reorganiza pra caber na largura atual da janela, e a largura "medida"
+// sempre dava quase igual à da própria janela — enganando a conta do
+// zoom (é por isso que mudar o zoom do navegador "por acaso" parecia
+// mudar o resultado: mudava a largura disponível pra reorganização).
+const LARGURA_PROJETO_PX = 1640;
+
 function ajustarEscalaTV(){
   if (!modoTVAtivo) return;
-  // Volta ao tamanho normal por um instante só para medir as dimensões
-  // reais do conteúdo sem escala nenhuma aplicada.
+
+  // Fixa a largura no tamanho de projeto ANTES de medir a altura — assim
+  // o layout renderiza do jeito "normal de desktop" (2 colunas, etc.),
+  // sem se achatar/reorganizar por causa do tamanho da janela atual.
   elEscala.style.transform = 'none';
-  elEscala.style.width = '';
-  const larguraConteudo = elEscala.scrollWidth;
-  const alturaConteudo  = elEscala.scrollHeight;
+  elEscala.style.width = LARGURA_PROJETO_PX + 'px';
+  const alturaConteudo = elEscala.scrollHeight;
 
   // "Fator de encaixe": a MENOR das duas proporções (largura e altura)
   // — isso garante que o conteúdo preencha o máximo possível da tela,
-  // em qualquer sentido, sem esticar/cortar nada. Ao contrário da versão
-  // anterior, aqui NÃO limitamos a 1× — numa TV grande, isso deixa o
-  // dashboard maior (preenchendo a tela), não só do tamanho original.
-  const fatorLargura = window.innerWidth  / larguraConteudo;
-  const fatorAltura   = window.innerHeight / alturaConteudo;
+  // em qualquer sentido, sem esticar/cortar nada. Pode ser maior que 1×
+  // (numa TV grande, isso deixa o dashboard maior que o tamanho normal,
+  // preenchendo mais da tela) ou menor que 1× (tela pequena, encolhe).
+  const fatorLargura = window.innerWidth  / LARGURA_PROJETO_PX;
+  const fatorAltura  = window.innerHeight / alturaConteudo;
   const fator = Math.min(fatorLargura, fatorAltura);
 
-  // LOG DE DIAGNÓSTICO — deixa registrado no Console (F12) toda vez que a
-  // escala é recalculada, com os números reais medidos naquele momento.
-  // Isso é o que precisamos ver quando o resultado visual difere entre
-  // aparelhos (notebook/TV vs monitor) sem nenhum erro/aviso disparar.
-  console.log('[Modo TV] ajustarEscalaTV()', {
-    'tela cheia ativa agora?': !!document.fullscreenElement,
-    'window.innerWidth': window.innerWidth,
-    'window.innerHeight': window.innerHeight,
-    'conteúdo scrollWidth': larguraConteudo,
-    'conteúdo scrollHeight': alturaConteudo,
-    'fator largura': fatorLargura.toFixed(3),
-    'fator altura': fatorAltura.toFixed(3),
-    'fator escolhido (menor dos dois)': fator.toFixed(3),
-    'devicePixelRatio': window.devicePixelRatio,
-  });
+  // LOG DE DIAGNÓSTICO — texto puro (não objeto), pra aparecer tudo
+  // legível se a pessoa só selecionar e copiar do Console, sem precisar
+  // clicar pra "expandir" nada (isso já causou confusão uma vez: o
+  // Console mostra objetos colapsados como "Object" até alguém clicar).
+  console.log(
+    `[Modo TV] ajustarEscalaTV() | fullscreen ativo=${!!document.fullscreenElement}` +
+    ` | window=${window.innerWidth}x${window.innerHeight}` +
+    ` | largura de projeto (fixa)=${LARGURA_PROJETO_PX}` +
+    ` | altura medida nessa largura=${alturaConteudo}` +
+    ` | fatorLargura=${fatorLargura.toFixed(3)}` +
+    ` | fatorAltura=${fatorAltura.toFixed(3)}` +
+    ` | FATOR ESCOLHIDO=${fator.toFixed(3)}` +
+    ` | devicePixelRatio=${window.devicePixelRatio}`
+  );
 
-  elEscala.style.transform = `scale(${fator})`;
-  // Compensa a largura na proporção inversa, pra continuar preenchendo
-  // a tela de ponta a ponta depois do scale() (que encolhe/aumenta a
-  // largura visual junto com a altura).
-  elEscala.style.width = (100/fator) + '%';
+  // Centraliza o resultado na tela (em vez de grudar no canto superior
+  // esquerdo) — fica mais parecido com um "quadro" no meio da TV quando
+  // a proporção da tela não bate exatamente com a do dashboard.
+  const larguraFinal = LARGURA_PROJETO_PX * fator;
+  const alturaFinal  = alturaConteudo * fator;
+  const deslocX = Math.max(0, (window.innerWidth  - larguraFinal) / 2);
+  const deslocY = Math.max(0, (window.innerHeight - alturaFinal) / 2);
+
+  elEscala.style.width = LARGURA_PROJETO_PX + 'px';
+  elEscala.style.transform = `translate(${deslocX}px, ${deslocY}px) scale(${fator})`;
 }
 
 async function ativarModoTV(){
@@ -822,11 +836,11 @@ async function ativarModoTV(){
 
   // LOG DE DIAGNÓSTICO — mostra logo de cara o que o navegador diz sobre
   // suporte a tela cheia neste aparelho, antes mesmo de tentar.
-  console.log('[Modo TV] iniciando ativarModoTV()', {
-    'document.fullscreenEnabled': document.fullscreenEnabled,
-    'requestFullscreen existe?': !!document.documentElement.requestFullscreen,
-    'já está em tela cheia?': !!document.fullscreenElement,
-  });
+  console.log(
+    `[Modo TV] iniciando ativarModoTV() | fullscreenEnabled=${document.fullscreenEnabled}` +
+    ` | requestFullscreen existe=${!!document.documentElement.requestFullscreen}` +
+    ` | já em tela cheia=${!!document.fullscreenElement}`
+  );
 
   try {
     if (!document.documentElement.requestFullscreen) {
@@ -839,7 +853,7 @@ async function ativarModoTV(){
       throw new Error('fullscreenEnabled=false (bloqueado pelo navegador/política do sistema)');
     }
     await document.documentElement.requestFullscreen();
-    console.log('[Modo TV] requestFullscreen() concluído sem erro. document.fullscreenElement agora é:', document.fullscreenElement);
+    console.log(`[Modo TV] requestFullscreen() concluído sem erro | em tela cheia agora=${!!document.fullscreenElement}`);
   } catch (e) {
     // Antes isso ficava em silêncio total — agora avisamos na tela e no
     // console (F12), pra dar pra descobrir o motivo exato quando acontece.
@@ -878,8 +892,10 @@ btnTV.addEventListener('click', ()=>{
 // (e não só logo após o requestFullscreen()) que recalculamos o zoom de
 // verdade. Também é aqui que detectamos saída manual (tecla Esc).
 document.addEventListener('fullscreenchange', ()=>{
-  console.log('[Modo TV] evento fullscreenchange disparou. document.fullscreenElement =', document.fullscreenElement,
-    '| window agora:', window.innerWidth, 'x', window.innerHeight);
+  console.log(
+    `[Modo TV] evento fullscreenchange disparou | em tela cheia agora=${!!document.fullscreenElement}` +
+    ` | window=${window.innerWidth}x${window.innerHeight}`
+  );
   if (document.fullscreenElement && modoTVAtivo) {
     ajustarEscalaTV();
   } else if (!document.fullscreenElement && modoTVAtivo) {
