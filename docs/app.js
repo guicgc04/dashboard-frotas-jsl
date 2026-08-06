@@ -88,6 +88,7 @@ const fleet = FLEET_RAW.map(f => ({
   ...f,
   modeloDisplay: f.modelo || '—',
   marcaDisplay: f.marca || '—',
+  tipoDisplay: f.tipo || '—',
   status: statusDaFrota(f),
   hasRealPreventiva: !!f.preventiva
 }));
@@ -156,6 +157,13 @@ const NOME_MES = {'01':'jan','02':'fev','03':'mar','04':'abr','05':'mai','06':'j
 // usada por praticamente todo o dashboard (gráfico de custo, donut,
 // rankings, KPIs e painel de detalhe), garantindo que todos concordem
 // entre si sobre o que está "dentro do filtro".
+// Igual ao filteredHist, mas SEM aplicar o filtro de mês — usada só pelo
+// gráfico de linha (seção 8), que precisa continuar mostrando a linha do
+// tempo inteira mesmo com um mês selecionado (ver comentário lá).
+function filteredHistSemMes(f){
+  return f.hist.filter(h=> !filters.classe || h.tipo === filters.classe);
+}
+
 function filteredHist(f){
   return f.hist.filter(h=>{
     if (filters.classe && h.tipo !== filters.classe) return false;
@@ -177,7 +185,8 @@ function applyFilters(list){
     const q = filters.search;
     if (q && !(f.frota.toLowerCase().includes(q) ||
                (f.modeloDisplay||'').toLowerCase().includes(q) ||
-               (f.marcaDisplay||'').toLowerCase().includes(q))) continue;
+               (f.marcaDisplay||'').toLowerCase().includes(q) ||
+               (f.tipoDisplay||'').toLowerCase().includes(q))) continue;
 
     const histFiltrado = filteredHist(f);
     if ((filters.classe || filters.mes) && histFiltrado.length === 0) continue;
@@ -199,10 +208,11 @@ function renderActiveTags(){
   if (filters.classe) tags.push(['Classificação: '+filters.classe, ()=>{document.getElementById('filterClass').value='';filters.classe='';renderAll();}]);
   if (filters.status) tags.push(['Status: '+statusLabel[filters.status], ()=>{document.getElementById('filterStatus').value='';filters.status='';renderAll();}]);
   if (filters.minCusto) tags.push(['Custo ≥ R$ '+filters.minCusto, ()=>{document.getElementById('filterMinCusto').value='';filters.minCusto=null;renderAll();}]);
-  if (filters.mes) {
-    const [ano,mes] = filters.mes.split('-');
-    tags.push(['Mês: '+NOME_MES[mes]+'/'+ano, ()=>{document.getElementById('filterMes').value='';filters.mes='';atualizarVisualFiltroMes();renderAll();}]);
-  }
+  // O filtro de mês NÃO ganha chip aqui de propósito — ele já tem seu
+  // próprio indicador no ícone de calendário do cabeçalho (fica branco +
+  // bolinha vermelha quando ativo, com legenda mostrando o mês). Um chip
+  // duplicado aqui embaixo dos KPIs só repetia a mesma informação num
+  // lugar solto, sem relação visual com o resto do filtro.
   box.innerHTML = tags.map(([label,_],i)=>`<span class="active-filter-tag" data-i="${i}">${label}<button>✕</button></span>`).join('');
   box.querySelectorAll('.active-filter-tag').forEach((el,i)=>{
     el.querySelector('button').addEventListener('click', tags[i][1]);
@@ -305,11 +315,38 @@ function svgEl(tag, attrs){
    com borda vermelha; passar o mouse ainda mostra o tooltip com o mês.
    Fonte dos dados: 3_0_-_Ajuste_da_base_de_Custo.xlsx (ver etl_frotas.py).
    ============================================================================ */
+// Lista de frotas para o gráfico de linha (seção 8): aplica status e
+// busca (atributos da própria frota, não dependem do mês), mas
+// DELIBERADAMENTE ignora o filtro de mês — usar a lista `data` normal
+// (já filtrada por mês) deixaria de fora frotas inteiras que não têm
+// registro naquele mês específico, cortando pedaços da linha do tempo
+// nos OUTROS meses também. O filtro de Classificação continua valendo
+// (é aplicado depois, no histórico, via filteredHistSemMes).
+function frotasParaGraficoCusto(){
+  return fleet.filter(f=>{
+    if (filters.status && f.status !== filters.status) return false;
+    const q = filters.search;
+    if (q && !(f.frota.toLowerCase().includes(q) ||
+               (f.modeloDisplay||'').toLowerCase().includes(q) ||
+               (f.marcaDisplay||'').toLowerCase().includes(q) ||
+               (f.tipoDisplay||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
 function renderCostChart(data){
-  // 1) Agrupa o valor de cada registro de histórico por "AAAA-MM"
+  // 1) Agrupa o valor de cada registro de histórico por "AAAA-MM".
+  // IMPORTANTE: usa frotasParaGraficoCusto() + filteredHistSemMes (não o
+  // `data`/filteredHist recebidos por parâmetro) de propósito — esse
+  // gráfico mostra uma LINHA DO TEMPO, então precisa continuar mostrando
+  // todos os meses mesmo quando um mês específico está selecionado no
+  // filtro; senão vira um gráfico de "evolução" com um ponto só (sem
+  // sentido) e ainda corta frotas inteiras dos outros meses. Em vez
+  // disso, destacamos visualmente o mês filtrado (ver passo 7) e
+  // deixamos o resto mais discreto.
   const byMonth = {};
-  data.forEach(f=>{
-    filteredHist(f).forEach(h=>{
+  frotasParaGraficoCusto().forEach(f=>{
+    filteredHistSemMes(f).forEach(h=>{
       const parts = h.data.split('/'); // h.data no formato dd/mm/aaaa
       if (parts.length!==3) return;
       const key = parts[2]+'-'+parts[1];
@@ -358,30 +395,43 @@ function renderCostChart(data){
   }
 
   // 5) Área preenchida (polígono fechado do zero até a linha e de volta)
+  // — fica mais apagada quando um mês está em destaque, pra não competir
+  // visualmente com o ponto selecionado.
   let areaPath = `M ${xAt(0)} ${yAt(0)} `;
   values.forEach((v,i)=> areaPath += `L ${xAt(i)} ${yAt(v)} `);
   areaPath += `L ${xAt(values.length-1)} ${yAt(0)} Z`;
-  svg.appendChild(svgEl('path', {d:areaPath, fill:'url(#areaGrad)', stroke:'none'}));
+  svg.appendChild(svgEl('path', {d:areaPath, fill:'url(#areaGrad)', stroke:'none', opacity: filters.mes?0.4:1}));
 
   // 6) Linha propriamente dita
   let linePath = values.map((v,i)=> (i===0?'M':'L') + ' ' + xAt(i) + ' ' + yAt(v)).join(' ');
   svg.appendChild(svgEl('path', {d:linePath, fill:'none', stroke:'#c8172f', 'stroke-width':3.5,
-    'stroke-linecap':'round', 'stroke-linejoin':'round'}));
+    'stroke-linecap':'round', 'stroke-linejoin':'round', opacity: filters.mes?0.35:1}));
 
   // 7) Para cada ponto: valor em R$ escrito acima, bolinha, tooltip no
-  //    hover, e o rótulo do mês no eixo X
+  //    hover, e o rótulo do mês no eixo X. Quando há um filtro de mês
+  //    ativo, o ponto daquele mês fica em destaque (maior, mais forte) e
+  //    os demais ficam esmaecidos — assim dá pra ver o mês escolhido sem
+  //    perder o contexto da linha do tempo inteira.
   values.forEach((v,i)=>{
-    const vt = svgEl('text', {x:xAt(i), y:yAt(v)-16, 'text-anchor':'middle', 'font-size':13, 'font-weight':700,
-      fill:'#c8172f', 'font-family':'Poppins,Arial,sans-serif'});
+    const emDestaque = filters.mes && labels[i] === filters.mes;
+    const apagado = filters.mes && !emDestaque;
+
+    const vt = svgEl('text', {x:xAt(i), y:yAt(v)-(emDestaque?20:16), 'text-anchor':'middle',
+      'font-size': emDestaque?15:13, 'font-weight':700,
+      fill: apagado?'#d7d9e2':'#c8172f', 'font-family':'Poppins,Arial,sans-serif'});
     vt.textContent = 'R$ ' + Math.round(v).toLocaleString('pt-BR');
     svg.appendChild(vt);
 
-    const c = svgEl('circle', {cx:xAt(i), cy:yAt(v), r:5.5, fill:'#fff', stroke:'#c8172f', 'stroke-width':3, class:'hoverable'});
+    const c = svgEl('circle', {cx:xAt(i), cy:yAt(v), r: emDestaque?8.5:5.5,
+      fill: apagado?'#fbeaec':'#fff', stroke: apagado?'#eec3c8':'#c8172f',
+      'stroke-width': emDestaque?4:3, class:'hoverable'});
     c.addEventListener('mousemove', e=> showTooltip(e, `${displayLabels[i]}: R$ ${fmtBRL(v)}`));
     c.addEventListener('mouseleave', hideTooltip);
     svg.appendChild(c);
 
-    const t = svgEl('text', {x:xAt(i), y:H-10, 'text-anchor':'middle', 'font-size':12.5, fill:'#7c8194', 'font-family':'Inter,Arial,sans-serif'});
+    const t = svgEl('text', {x:xAt(i), y:H-10, 'text-anchor':'middle',
+      'font-size': emDestaque?13.5:12.5, 'font-weight': emDestaque?700:400,
+      fill: emDestaque?'#c8172f':(apagado?'#d7d9e2':'#7c8194'), 'font-family':'Inter,Arial,sans-serif'});
     t.textContent = displayLabels[i];
     svg.appendChild(t);
   });
@@ -557,7 +607,7 @@ function renderFleetTable(data){
   body.innerHTML = '';
 
   if (sorted.length === 0){
-    body.innerHTML = '<tr class="empty-row"><td colspan="6">Nenhuma frota corresponde aos filtros selecionados.</td></tr>';
+    body.innerHTML = '<tr class="empty-row"><td colspan="7">Nenhuma frota corresponde aos filtros selecionados.</td></tr>';
     return;
   }
 
@@ -566,6 +616,7 @@ function renderFleetTable(data){
     if (activeIdx === f.frota) tr.classList.add('active'); // realça a linha da frota aberta no painel de detalhe
     tr.innerHTML = `
       <td><b>${f.frota}</b>${f.hasRealPreventiva ? ' <span title="Status real cruzado com Preventiva_-_Gru.csv" style="color:#1f7a2c;">●</span>' : ''}</td>
+      <td>${f.tipoDisplay}</td>
       <td>${f.modeloDisplay}</td>
       <td>${f.marcaDisplay}</td>
       <td><span class="dot ${f.status}"></span><span class="status-text ${f.status}">${statusLabel[f.status]}</span></td>
@@ -594,7 +645,7 @@ function openDetail(f, tr){
   // Cabeçalho: nome da frota + dados cadastrais (se existirem)
   document.getElementById('detFrota').textContent = 'Frota ' + f.frota;
   document.getElementById('detModelo').textContent =
-    (f.modelo ? `${f.modelo} · ${f.marca||''} · ${f.ano||''} · Chassi ${f.chassi||'—'}` : 'Sem dados cadastrais vinculados nesta prévia');
+    (f.modelo ? `${f.tipo ? f.tipo+' · ' : ''}${f.modelo} · ${f.marca||''} · ${f.ano||''} · Chassi ${f.chassi||'—'}` : 'Sem dados cadastrais vinculados nesta prévia');
   document.getElementById('detailHint').textContent = selecaoManual
     ? 'clique em outra linha na tabela para trocar de frota'
     : 'mostrando a frota de maior custo acumulado — clique em outra linha na tabela para ver os detalhes dela';
@@ -718,7 +769,7 @@ function toCSVValue(v){
 }
 
 document.getElementById('exportBtn').addEventListener('click', ()=>{
-  const headers = ['Frota','Modelo','Marca','Ano','Chassi','Data','Classificacao','Material_Descricao','Valor',
+  const headers = ['Frota','Tipo_Equipamento','Modelo','Marca','Ano','Chassi','Data','Classificacao','Material_Descricao','Valor',
                    'Ultima_Preventiva_Data','Ultima_Preventiva_Plano','Proximo_Plano','Proximo_Vencimento_Horimetro','Desvio_Horas'];
   const lines = [headers.join(',')];
 
@@ -726,7 +777,7 @@ document.getElementById('exportBtn').addEventListener('click', ()=>{
     const p = f.preventiva || {};
     f.hist.forEach(h=>{
       const row = [
-        f.frota, f.modeloDisplay, f.marcaDisplay, f.ano||'', f.chassi||'',
+        f.frota, f.tipoDisplay, f.modeloDisplay, f.marcaDisplay, f.ano||'', f.chassi||'',
         h.data, h.tipo, h.material||'', h.valor,
         p.ultima_realizada_data||'', p.ultima_realizada_sigla||'',
         p.proxima_sigla||'', p.proxima_vencimento_horimetro||'', p.proxima_desvio!=null?p.proxima_desvio:''
