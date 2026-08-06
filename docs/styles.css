@@ -139,7 +139,7 @@ h1,h2,h3,.font-display{ font-family:var(--font-display); }
    O <select> de verdade fica por cima do ícone, do tamanho do círculo
    inteiro, mas INVISÍVEL (opacity:0) — assim o clique abre o menu nativo
    de meses normalmente, só que visualmente só aparece o ícone. */
-.icon-mes-wrap{ position:relative; overflow:hidden; }
+.icon-mes-wrap{ position:relative; }
 .icon-mes-wrap .icon-mes{
   position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
   pointer-events:none; width:16px; height:16px; stroke:#fff; fill:none;
@@ -153,6 +153,10 @@ h1,h2,h3,.font-display{ font-family:var(--font-display); }
    em branco — mesmo padrão visual do Modo TV quando ativo. */
 .icon-mes-wrap.tem-filtro{ background:#fff; }
 .icon-mes-wrap.tem-filtro .icon-mes{ stroke:var(--red); }
+.icon-mes-wrap.tem-filtro::before{
+  content:''; position:absolute; top:-2px; right:-2px; width:11px; height:11px;
+  background:var(--red); border:2px solid var(--red-dark); border-radius:50%; z-index:2;
+}
 
 /* Estado específico do botão "Modo TV" — dois ícones (expandir/sair) que
    alternam via a classe .active, aplicada pelo app.js. */

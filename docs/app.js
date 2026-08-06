@@ -792,6 +792,22 @@ function ajustarEscalaTV(){
   const fatorAltura   = window.innerHeight / alturaConteudo;
   const fator = Math.min(fatorLargura, fatorAltura);
 
+  // LOG DE DIAGNÓSTICO — deixa registrado no Console (F12) toda vez que a
+  // escala é recalculada, com os números reais medidos naquele momento.
+  // Isso é o que precisamos ver quando o resultado visual difere entre
+  // aparelhos (notebook/TV vs monitor) sem nenhum erro/aviso disparar.
+  console.log('[Modo TV] ajustarEscalaTV()', {
+    'tela cheia ativa agora?': !!document.fullscreenElement,
+    'window.innerWidth': window.innerWidth,
+    'window.innerHeight': window.innerHeight,
+    'conteúdo scrollWidth': larguraConteudo,
+    'conteúdo scrollHeight': alturaConteudo,
+    'fator largura': fatorLargura.toFixed(3),
+    'fator altura': fatorAltura.toFixed(3),
+    'fator escolhido (menor dos dois)': fator.toFixed(3),
+    'devicePixelRatio': window.devicePixelRatio,
+  });
+
   elEscala.style.transform = `scale(${fator})`;
   // Compensa a largura na proporção inversa, pra continuar preenchendo
   // a tela de ponta a ponta depois do scale() (que encolhe/aumenta a
@@ -803,16 +819,27 @@ async function ativarModoTV(){
   modoTVAtivo = true;
   btnTV.classList.add('active');
   document.body.style.overflow = 'hidden'; // evita barra de rolagem residual
+
+  // LOG DE DIAGNÓSTICO — mostra logo de cara o que o navegador diz sobre
+  // suporte a tela cheia neste aparelho, antes mesmo de tentar.
+  console.log('[Modo TV] iniciando ativarModoTV()', {
+    'document.fullscreenEnabled': document.fullscreenEnabled,
+    'requestFullscreen existe?': !!document.documentElement.requestFullscreen,
+    'já está em tela cheia?': !!document.fullscreenElement,
+  });
+
   try {
-    if (!document.fullscreenEnabled) {
+    if (!document.documentElement.requestFullscreen) {
+      throw new Error('Este navegador não tem suporte à função de tela cheia (requestFullscreen não existe)');
+    }
+    if (document.fullscreenEnabled === false) {
       // O NAVEGADOR AVISA DE ANTEMÃO que tela cheia está bloqueada (comum
       // em máquina de empresa, quando o TI desativa isso por política) —
       // nesse caso nem tentamos, já mostramos o aviso direto.
       throw new Error('fullscreenEnabled=false (bloqueado pelo navegador/política do sistema)');
     }
-    if (document.documentElement.requestFullscreen) {
-      await document.documentElement.requestFullscreen();
-    }
+    await document.documentElement.requestFullscreen();
+    console.log('[Modo TV] requestFullscreen() concluído sem erro. document.fullscreenElement agora é:', document.fullscreenElement);
   } catch (e) {
     // Antes isso ficava em silêncio total — agora avisamos na tela e no
     // console (F12), pra dar pra descobrir o motivo exato quando acontece.
@@ -851,6 +878,8 @@ btnTV.addEventListener('click', ()=>{
 // (e não só logo após o requestFullscreen()) que recalculamos o zoom de
 // verdade. Também é aqui que detectamos saída manual (tecla Esc).
 document.addEventListener('fullscreenchange', ()=>{
+  console.log('[Modo TV] evento fullscreenchange disparou. document.fullscreenElement =', document.fullscreenElement,
+    '| window agora:', window.innerWidth, 'x', window.innerHeight);
   if (document.fullscreenElement && modoTVAtivo) {
     ajustarEscalaTV();
   } else if (!document.fullscreenElement && modoTVAtivo) {
